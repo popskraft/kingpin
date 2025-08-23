@@ -29,11 +29,13 @@ class Card(BaseModel):
     name: str
     type: CardType = CardType.common
     faction: Faction | str = Faction.neutral
+    caste: Optional[str] = None
     hp: int = 1
     atk: int = 0
     d: int = 0  # темп найма Братков
-    # Способность: числовое значение или словарь трейтов (в т.ч. вложенные, напр. {"extra_defense": 1, "on_enter": {"steal": 2}})
-    abl: int | Dict[str, int | dict] = 0
+    # Способность: числовое значение или словарь трейтов (в т.ч. вложенные). Допускаем строковые значения
+    # для спец-маркеров вроде "all": {"anti_corruption": "all"}
+    abl: int | Dict[str, int | str | dict] = 0
     # DEPRECATED: старое имя поля; поддерживаем для обратной совместимости и мигрируем в abl
     inf: Optional[int | Dict[str, int]] = None
     paid: List[PaidAbility] = Field(default_factory=list)

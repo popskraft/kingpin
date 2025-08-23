@@ -24,7 +24,7 @@ def main():
     args = parser.parse_args()
     
     # Путь к файлу с картами
-    cards_file = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'cards.csv')
+    cards_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'cards.csv')
     
     if not os.path.exists(cards_file):
         print(f"Ошибка: файл {cards_file} не найден")
