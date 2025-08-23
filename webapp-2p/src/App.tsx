@@ -285,6 +285,31 @@ export default function App(): JSX.Element {
   const isAttacker = attack && seat ? attack.attacker === seat : false
   const isTarget = attack && seat ? attack.target.pid === seat : false
 
+  // --- Client-side estimation helpers for global buffs ---
+  const parseGivesGlobalAtk = (card: Card | null | undefined): number => {
+    if (!card) return 0
+    const type = (card.type || '').toLowerCase()
+    if (type === 'boss') return 1 // Boss Rage: +1 ATK всем
+    const txt = `${card.name} ${(card.notes || '')}`.toLowerCase()
+    if (/\+\s*1\s*atk.*(всем|all)/i.test(txt)) return 1
+    if (/получают\s*\+\s*1\s*atk/i.test(txt)) return 1
+    const m = (card.notes || '').match(/rage\s*:\s*([1-9]\d*)/i)
+    if (m) return parseInt(m[1], 10)
+    return 0
+  }
+
+  const calcRagePerCard = (sideBoard?: Slot[]): number =>
+    (sideBoard || []).reduce((acc, sl) => acc + parseGivesGlobalAtk(sl.card), 0)
+
+  const calcGlobalDefend = (sideBoard?: Slot[]): number => {
+    const base = (sideBoard || []).reduce((acc, sl) => acc + (sl.card?.d ?? 0), 0)
+    const bossBonus = (sideBoard || []).some(sl => (sl.card?.type || '').toLowerCase() === 'boss') ? 1 : 0
+    return base + bossBonus
+  }
+
+  const ragePerCardYou = useMemo(() => calcRagePerCard(you?.board), [you?.board])
+  const defendGlobalOpp = useMemo(() => calcGlobalDefend(opp?.board), [opp?.board])
+
   // Shared bank: total 36 tokens across both players
   const TOTAL_MONEY_TOKENS = 36
   const yourMoney = you?.tokens?.reserve_money ?? 0
@@ -674,6 +699,32 @@ export default function App(): JSX.Element {
                 </div>
               </div>
 
+              {/* Calculations: total ATK and defender HP */}
+              <div className="calc-block">
+                {(() => {
+                  // Total ATK
+                  const atkCards = selectedAttackers.map(i => you?.board?.[i]?.card).filter(Boolean) as Card[]
+                  const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
+                  const perCardBuff = ragePerCardYou
+                  const buffSum = (perCardBuff > 0 ? selectedAttackers.length * perCardBuff : 0)
+                  const totalAtk = baseSum + buffSum
+                  // Defender HP
+                  const tSlot = localAttackModal.targetSlot
+                  const defSlot = opp?.board?.[tSlot]
+                  const defCard = defSlot?.card
+                  const baseHP = defCard?.hp ?? 0
+                  const shields = defSlot?.muscles ?? 0
+                  const defBonus = defendGlobalOpp
+                  const totalHP = baseHP + shields + defBonus
+                  return (
+                    <>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${selectedAttackers.length}×${perCardBuff}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{defBonus > 0 ? ` + ${defBonus}` : ''} = <b>{totalHP}</b></div>
+                    </>
+                  )
+                })()}
+              </div>
+
               {/* Controls */}
               <div className="modal-controls">
                 <div className="control-row">
@@ -751,6 +802,41 @@ export default function App(): JSX.Element {
               <div className="attackers">
                 <div className="label">Атакующие</div>
                 <div className="list">{attack.attackerSlots.map(i => `#${i + 1}`).join(', ')}</div>
+              </div>
+
+              {/* Calculations: total ATK and defender HP (visible обеим сторонам) */}
+              <div className="calc-block">
+                {(() => {
+                  const atkIsYou = attack.attacker === you?.id
+                  const attBoard = atkIsYou ? (you?.board || []) : (opp?.board || [])
+                  const defIsYou = attack.target.pid === you?.id
+                  const defBoard = defIsYou ? (you?.board || []) : (opp?.board || [])
+
+                  // Total ATK
+                  const atkCards = attack.attackerSlots
+                    .map(i => attBoard?.[i]?.card)
+                    .filter(Boolean) as Card[]
+                  const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
+                  const perCardBuff = calcRagePerCard(attBoard)
+                  const buffSum = (perCardBuff > 0 ? attack.attackerSlots.length * perCardBuff : 0)
+                  const totalAtk = baseSum + buffSum
+
+                  // Defender HP
+                  const tSlot = attack.target.slot
+                  const defSlot = defBoard?.[tSlot]
+                  const defCard = defSlot?.card
+                  const baseHP = defCard?.hp ?? 0
+                  const shields = defSlot?.muscles ?? 0
+                  const defBonus = calcGlobalDefend(defBoard)
+                  const totalHP = baseHP + shields + defBonus
+
+                  return (
+                    <>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${attack.attackerSlots.length}×${perCardBuff}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{defBonus > 0 ? ` + ${defBonus}` : ''} = <b>{totalHP}</b></div>
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Controls for defender */}
