@@ -277,7 +277,13 @@ export default function App(): JSX.Element {
   const TOTAL_MONEY_TOKENS = 36
   const yourMoney = you?.tokens?.reserve_money ?? 0
   const oppMoney = opp?.tokens?.reserve_money ?? 0
-  const bankMoney = Math.max(0, TOTAL_MONEY_TOKENS - yourMoney - oppMoney)
+  // Shields on boards
+  const totalYourShields = useMemo(() => (you?.board ?? []).reduce((acc, sl) => acc + (sl?.muscles ?? 0), 0), [you?.board])
+  const totalOppShields = useMemo(() => (opp?.board ?? []).reduce((acc, sl) => acc + (sl?.muscles ?? 0), 0), [opp?.board])
+  // Bank holds everything not in reserves and not on boards as shields
+  const bankMoney = Math.max(0, TOTAL_MONEY_TOKENS - yourMoney - oppMoney - totalYourShields - totalOppShields)
+  // Your actual reserve (spendable money)
+  const availableMoney = Math.max(0, (yourMoney ?? 0))
 
   const handleDraw = () => socket?.emit('draw', { room: ROOM })
   const handleFlip = (i: number) => socket?.emit('flip_card', { room: ROOM, slotIndex: i })
@@ -285,8 +291,11 @@ export default function App(): JSX.Element {
   const moveFromSlotToSlot = (fromIndex: number, toIndex: number) => socket?.emit('move_card', { room: ROOM, from: 'slot', to: 'slot', fromIndex, toIndex })
   const moveFromSlotToHand = (slotIndex: number) => socket?.emit('move_card', { room: ROOM, from: 'slot', to: 'hand', fromIndex: slotIndex })
   const sendSetVisible = (n: number) => socket?.emit('set_visible_slots', { room: ROOM, count: n })
-  const addShield = (i: number) => socket?.emit('add_token', { room: ROOM, kind: 'shield', slotIndex: i, count: 1 })
-  const removeShield = (i: number) => socket?.emit('remove_token', { room: ROOM, kind: 'shield', slotIndex: i, count: 1 })
+  // Shield ops
+  const addShieldFromReserve = (i: number) => socket?.emit('add_shield_from_reserve', { room: ROOM, slotIndex: i, count: 1 })
+  const removeShieldToReserve = (i: number) => socket?.emit('remove_shield_to_reserve', { room: ROOM, slotIndex: i, count: 1 })
+  const addShieldOnly = (i: number) => socket?.emit('add_shield_only', { room: ROOM, slotIndex: i, count: 1 })
+  const removeShieldOnly = (i: number) => socket?.emit('remove_shield_only', { room: ROOM, slotIndex: i, count: 1 })
   const addMoney = (n: number) => socket?.emit('add_token', { room: ROOM, kind: 'money', count: n })
   const removeMoney = (n: number) => socket?.emit('remove_token', { room: ROOM, kind: 'money', count: n })
   const shuffleDeck = () => socket?.emit('shuffle_deck', { room: ROOM })
@@ -422,10 +431,16 @@ export default function App(): JSX.Element {
                   onDropToSlot={(from) => handleDropToSlot(i, from)}
                   canAddShield={(yourMoney ?? 0) > 0}
                   canRemoveShield={(s?.muscles ?? 0) > 0}
-                  onTokenPlus={() => { if ((yourMoney ?? 0) > 0) { addShield(i); removeMoney(1) } }}
-                  onTokenPlusFromBank={() => { /* Temporarily route via reserve to keep bank correct */ addMoney(1); addShield(i); removeMoney(1) }}
-                  onTokenMinus={() => { if ((s?.muscles ?? 0) > 0) { removeShield(i); addMoney(1) } }}
-                  onReceiveShieldFrom={(srcIndex: number) => { if (srcIndex !== i) { removeShield(srcIndex); addShield(i) } }}
+                  onTokenPlus={() => { // Spend from your reserve to place a shield
+                    if ((yourMoney ?? 0) > 0) { addShieldFromReserve(i) }
+                  }}
+                  onTokenPlusFromBank={() => { // Bank tokens are not draggable; fallback to reserve spend
+                    if ((yourMoney ?? 0) > 0) { addShieldFromReserve(i) }
+                  }}
+                  onTokenMinus={() => { // Return shield back to your reserve
+                    if ((s?.muscles ?? 0) > 0) { removeShieldToReserve(i) }
+                  }}
+                  onReceiveShieldFrom={(srcIndex: number) => { if (srcIndex !== i) { removeShieldOnly(srcIndex); addShieldOnly(i) } }}
                 />
               ))}
             </div>
@@ -442,11 +457,11 @@ export default function App(): JSX.Element {
             </div>
 
             <div className="your-tokens" id="your_tokens">
-              <div className="money" id="your_money">
+              <div className="money" id="your_money" title={`Your reserve: ${yourMoney}`}>
                 <button id="btn_money_minus" className="tkn-btn" onClick={() => removeMoney(1)} disabled={yourMoney <= 0}>−</button>
-                💰 <AnimatedNumber value={yourMoney} />
+                💰 <AnimatedNumber value={availableMoney} />
                 <button id="btn_money_plus" className="tkn-btn" onClick={() => addMoney(1)} disabled={bankMoney <= 0}>＋</button>
-                <MoneyThumbnails count={yourMoney} draggableTokens={true} owner="you" />
+                <MoneyThumbnails count={availableMoney} draggableTokens={true} owner="you" />
               </div>
               <div className="otboy" id="your_otboy">♻️ {you?.tokens?.otboy ?? 0}</div>
             </div>
@@ -459,15 +474,15 @@ export default function App(): JSX.Element {
             <div className="pile-count" id="pile_draw_count">{view?.shared?.deckCount ?? 0}</div>
             <button id="btn_draw_sidebar" onClick={handleDraw}>Draw</button>
           </div>
-          <div className="pile-box pile-reserve" id="pile_safe_bank" title={`Всего 36, осталось ${bankMoney}`} onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={(e: React.DragEvent) => {
+          <div className="pile-box pile-reserve" id="pile_safe_bank" title={`Bank: ${bankMoney} (total ${TOTAL_MONEY_TOKENS} − reserves ${yourMoney + oppMoney} − shields ${totalYourShields + totalOppShields})`} onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={(e: React.DragEvent) => {
             const data = e.dataTransfer.getData('application/x-token')
             if (!data) return
             try {
               const tok = JSON.parse(data) as TokenDrag
               if (tok.kind === 'shield') {
                 if (tok.owner === 'you' && typeof tok.slotIndex === 'number') {
-                  removeShield(tok.slotIndex)
-                  addMoney(1)
+                  // Convert your shield back to your reserve (bank unchanged)
+                  removeShieldToReserve(tok.slotIndex)
                 } else if (tok.owner === 'opponent' && typeof tok.slotIndex === 'number') {
                   socket?.emit('remove_op_shield', { room: ROOM, slotIndex: tok.slotIndex })
                 }
@@ -476,7 +491,8 @@ export default function App(): JSX.Element {
           }}>
             <div className="pile-title" id="pile_safe_bank_title">Safe (bank)</div>
             <div className="pile-count" id="pile_safe_bank_count">💰 <AnimatedNumber value={bankMoney} /></div>
-            <MoneyThumbnails count={bankMoney} draggableTokens={true} owner="bank" />
+            {/* Do not allow dragging tokens from bank to avoid reserve/bank changes during internal distribution */}
+            <MoneyThumbnails count={bankMoney} draggableTokens={false} owner="bank" />
           </div>
           <div className="pile-box pile-reserve" id="pile_reserve" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onShelfDrop}>
             <div className="pile-title" id="pile_reserve_title">Reserve</div>

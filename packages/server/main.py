@@ -420,6 +420,126 @@ async def remove_op_shield(sid, data):
 
 
 @sio.event
+async def add_shield_only(sid, data):
+    """Add shield to slot without changing reserve money.
+    Used for internal shield distribution.
+    Client sends: { slotIndex, count }
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    st: GameState = rooms.get(room, {}).get("state")
+    if not st:
+        return
+    try:
+        si = int(data.get("slotIndex", -1))
+        count = int(data.get("count", 1))
+    except Exception:
+        return
+    if si < 0 or si >= len(st.players[pid].slots):
+        return
+    st.players[pid].slots[si].muscles += max(0, count)
+    _log(room, "token", f"{pid} +{max(0, count)} shield on slot {si+1} (internal)", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
+async def remove_shield_only(sid, data):
+    """Remove shield from slot without changing reserve money.
+    Used for internal shield distribution.
+    Client sends: { slotIndex, count }
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    st: GameState = rooms.get(room, {}).get("state")
+    if not st:
+        return
+    try:
+        si = int(data.get("slotIndex", -1))
+        count = int(data.get("count", 1))
+    except Exception:
+        return
+    if si < 0 or si >= len(st.players[pid].slots):
+        return
+    st.players[pid].slots[si].muscles = max(0, st.players[pid].slots[si].muscles - max(0, count))
+    _log(room, "token", f"{pid} -{max(0, count)} shield on slot {si+1} (internal)", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
+async def add_shield_from_reserve(sid, data):
+    """Atomically move money from player's reserve to a shield on a slot.
+    This represents spending reserve money to place shields. Does not affect bank directly.
+    Client sends: { slotIndex, count }
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    st: GameState = rooms.get(room, {}).get("state")
+    if not st:
+        return
+    try:
+        si = int(data.get("slotIndex", -1))
+        count = int(data.get("count", 1))
+    except Exception:
+        return
+    if si < 0 or si >= len(st.players[pid].slots):
+        return
+    n = max(0, count)
+    if n <= 0:
+        return
+    p = st.players[pid]
+    take = min(n, max(0, p.tokens.reserve_money))
+    if take <= 0:
+        return
+    p.tokens.reserve_money -= take
+    p.slots[si].muscles += take
+    _log(room, "token", f"{pid} spent {take} money → +{take} shield on slot {si+1}", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
+async def remove_shield_to_reserve(sid, data):
+    """Atomically move shield(s) from a slot back to player's reserve.
+    Internal redistribution: does not affect bank directly.
+    Client sends: { slotIndex, count }
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    st: GameState = rooms.get(room, {}).get("state")
+    if not st:
+        return
+    try:
+        si = int(data.get("slotIndex", -1))
+        count = int(data.get("count", 1))
+    except Exception:
+        return
+    if si < 0 or si >= len(st.players[pid].slots):
+        return
+    n = max(0, count)
+    if n <= 0:
+        return
+    p = st.players[pid]
+    give = min(n, max(0, p.slots[si].muscles))
+    if give <= 0:
+        return
+    p.slots[si].muscles -= give
+    p.tokens.reserve_money += give
+    _log(room, "token", f"{pid} returned {give} shield → +{give} money to reserve from slot {si+1}", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
 async def cursor(sid, data):
     """Relay normalized cursor coordinates within the board to the other player in the same room.
     Client sends: { room, x, y, visible }
