@@ -75,6 +75,7 @@ function CardView({ card, faceUp }: { card: Card | null, faceUp: boolean }) {
 }
 
 type DragPayload = { from: 'hand' | 'slot' | 'shelf'; fromIndex: number }
+type TokenDrag = { kind: 'money' | 'shield', owner: 'you' | 'opponent' | 'bank', slotIndex?: number }
 
 function OpponentHandThumbnails({ count }: { count: number }) {
   const n = Math.max(0, count)
@@ -92,13 +93,22 @@ function OpponentHandThumbnails({ count }: { count: number }) {
   )
 }
 
-function MoneyThumbnails({ count }: { count: number }): JSX.Element {
+function MoneyThumbnails({ count, draggableTokens = false, owner = 'you' }: { count: number, draggableTokens?: boolean, owner?: 'you' | 'bank' }): JSX.Element {
   const n = Math.max(0, count)
   const shown = Math.min(n, 10)
   return (
     <div className="money-list">
       {Array.from({ length: shown }).map((_, i) => (
-        <div key={i} className="money-token" />
+        <div
+          key={i}
+          className="money-token"
+          draggable={draggableTokens}
+          onDragStart={draggableTokens ? (e) => {
+            const payload: TokenDrag = { kind: 'money', owner }
+            e.dataTransfer.setData('application/x-token', JSON.stringify(payload))
+          } : undefined}
+          title={draggableTokens ? 'Drag to a card to add a shield' : undefined}
+        />
       ))}
       {n > shown ? <div className="money-extra">+{n - shown}</div> : null}
     </div>
@@ -119,18 +129,33 @@ function AnimatedNumber({ value, className }: { value: number, className?: strin
   return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
 }
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, onTokenPlus, onTokenMinus, canAddShield, canRemoveShield }:
-  { slot: Slot, index: number, editable?: boolean, onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean }): JSX.Element {
+function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield }:
+  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean }): JSX.Element {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    // Card movement
     const data = e.dataTransfer.getData('application/json')
-    try {
-      const from = JSON.parse(data) as DragPayload
-      onDropToSlot?.(from)
-    } catch {}
+    if (data) {
+      try {
+        const from = JSON.parse(data) as DragPayload
+        onDropToSlot?.(from)
+        return
+      } catch {}
+    }
+    // Token movement (money -> shield)
+    const tokenData = e.dataTransfer.getData('application/x-token')
+    if (tokenData) {
+      try {
+        const tok = JSON.parse(tokenData) as TokenDrag
+        if (tok.kind === 'money' && owner === 'you') {
+          if (tok.owner === 'you') onTokenPlus?.()
+          else if (tok.owner === 'bank') onTokenPlusFromBank?.()
+        }
+      } catch {}
+    }
   }
   const draggable = editable && !!slot.card
   const handleDragStart = (e: React.DragEvent) => {
@@ -138,14 +163,22 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, onTokenPlus, on
   }
   return (
     <div className="slot" onDragOver={handleDragOver} onDrop={handleDrop}>
-      <div className="shield-thumbs" title={`Shield defenders: ${Math.min(4, Math.max(0, slot.muscles))}`}>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className={`shield-thumb ${i < Math.min(4, Math.max(0, slot.muscles)) ? 'filled' : 'empty'}`}
-            aria-label={i < Math.min(4, Math.max(0, slot.muscles)) ? 'defender' : 'placeholder'}
-          />
-        ))}
+      <div className="shield-thumbs" title={`Shield defenders: ${Math.min(4, Math.max(0, slot.muscles))}`} onDragOver={(e) => e.preventDefault()}>
+        {Array.from({ length: 4 }).map((_, i) => {
+          const filled = i < Math.min(4, Math.max(0, slot.muscles))
+          return (
+            <div
+              key={i}
+              className={`shield-thumb ${filled ? 'filled' : 'empty'}`}
+              aria-label={filled ? 'defender' : 'placeholder'}
+              draggable={filled}
+              onDragStart={filled ? (e) => {
+                const payload: TokenDrag = { kind: 'shield', owner, slotIndex: index }
+                e.dataTransfer.setData('application/x-token', JSON.stringify(payload))
+              } : undefined}
+            />
+          )
+        })}
       </div>
       <div className="slot-header">
         {editable ? (
@@ -174,6 +207,9 @@ export default function App(): JSX.Element {
   const [view, setView] = useState<ViewState | null>(null)
   const [source, setSource] = useState<'yaml' | 'csv'>('yaml')
   const [seat, setSeat] = useState<'P1' | 'P2' | null>(null)
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const [oppCursor, setOppCursor] = useState<{ x: number, y: number, visible: boolean }>({ x: 0.5, y: 0.5, visible: false })
+  const lastSent = useRef<number>(0)
 
   // Title reflects current seat to differentiate tabs
   useEffect(() => {
@@ -201,6 +237,15 @@ export default function App(): JSX.Element {
     })
     s.on('room_full', () => {
       alert('Room is full')
+    })
+    s.on('cursor', (payload: any) => {
+      // Ignore our own echo (server already skips, but be safe)
+      if (!payload) return
+      if (payload.pid === seat) return
+      const x = Math.max(0, Math.min(1, Number(payload.x) || 0))
+      const y = Math.max(0, Math.min(1, Number(payload.y) || 0))
+      const visible = !!payload.visible
+      setOppCursor({ x, y, visible })
     })
     s.on('error', (payload: any) => {
       if (payload?.msg === 'deck_empty') {
@@ -246,6 +291,23 @@ export default function App(): JSX.Element {
   const endTurn = () => socket?.emit('end_turn', { room: ROOM })
 
   const visibleYou = view?.meta?.visible_slots?.you ?? 6
+
+  const emitCursor = (x: number, y: number, visible = true) => {
+    const now = performance.now()
+    if (now - (lastSent.current || 0) < 40) return // ~25 fps throttle
+    lastSent.current = now
+    socket?.emit('cursor', { room: ROOM, x, y, visible })
+  }
+
+  const onBoardMouseMove = (e: React.MouseEvent) => {
+    const el = boardRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+    emitCursor(Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y)), true)
+  }
+  const onBoardMouseLeave = () => emitCursor(0, 0, false)
 
   const handleDropToSlot = (slotIndex: number, from: DragPayload) => {
     if (!from) return
@@ -322,13 +384,16 @@ export default function App(): JSX.Element {
       </header>
 
       <div className="main" id="main">
-        <div className="board" id="board">
+        <div className="board" id="board" ref={boardRef} onMouseMove={onBoardMouseMove} onMouseLeave={onBoardMouseLeave}>
+          {oppCursor.visible && (
+            <div className="op-cursor" style={{ left: `${oppCursor.x * 100}%`, top: `${oppCursor.y * 100}%` }} title="Opponent cursor" />
+          )}
           <section className={`opponent ${turn && !isYourTurn ? 'active-turn' : ''}`} id="section_opponent">
             <h3 id="opponent_title">Opponent Board ({opp?.id ?? '—'})</h3>
             <OpponentHandThumbnails count={opp?.handCount ?? 0} />
             <div className="slots-grid" id="opp_slots">
               {opp?.board?.map((s: Slot, i: number) => (
-                <SlotView key={i} slot={s} index={i} editable={false} />
+                <SlotView key={i} slot={s} index={i} editable={false} owner="opponent" />
               ))}
             </div>
             <div className="tokens-row" id="opp_tokens_row">
@@ -345,11 +410,13 @@ export default function App(): JSX.Element {
                   slot={s}
                   index={i}
                   editable
+                  owner="you"
                   onFlip={() => handleFlip(i)}
                   onDropToSlot={(from) => handleDropToSlot(i, from)}
                   canAddShield={(yourMoney ?? 0) > 0}
                   canRemoveShield={(s?.muscles ?? 0) > 0}
                   onTokenPlus={() => { if ((yourMoney ?? 0) > 0) { addShield(i); removeMoney(1) } }}
+                  onTokenPlusFromBank={() => { /* Temporarily route via reserve to keep bank correct */ addMoney(1); addShield(i); removeMoney(1) }}
                   onTokenMinus={() => { if ((s?.muscles ?? 0) > 0) { removeShield(i); addMoney(1) } }}
                 />
               ))}
@@ -371,7 +438,7 @@ export default function App(): JSX.Element {
                 <button id="btn_money_minus" className="tkn-btn" onClick={() => removeMoney(1)} disabled={yourMoney <= 0}>−</button>
                 💰 <AnimatedNumber value={yourMoney} />
                 <button id="btn_money_plus" className="tkn-btn" onClick={() => addMoney(1)} disabled={bankMoney <= 0}>＋</button>
-                <MoneyThumbnails count={yourMoney} />
+                <MoneyThumbnails count={yourMoney} draggableTokens={true} owner="you" />
               </div>
               <div className="otboy" id="your_otboy">♻️ {you?.tokens?.otboy ?? 0}</div>
             </div>
@@ -384,12 +451,26 @@ export default function App(): JSX.Element {
             <div className="pile-count" id="pile_draw_count">{view?.shared?.deckCount ?? 0}</div>
             <button id="btn_draw_sidebar" onClick={handleDraw}>Draw</button>
           </div>
-          <div className="pile-box pile-reserve" id="pile_safe_bank" title={`Всего 36, осталось ${bankMoney}`}>
+          <div className="pile-box pile-reserve" id="pile_safe_bank" title={`Всего 36, осталось ${bankMoney}`} onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={(e: React.DragEvent) => {
+            const data = e.dataTransfer.getData('application/x-token')
+            if (!data) return
+            try {
+              const tok = JSON.parse(data) as TokenDrag
+              if (tok.kind === 'shield') {
+                if (tok.owner === 'you' && typeof tok.slotIndex === 'number') {
+                  removeShield(tok.slotIndex)
+                  addMoney(1)
+                } else if (tok.owner === 'opponent' && typeof tok.slotIndex === 'number') {
+                  socket?.emit('remove_op_shield', { room: ROOM, slotIndex: tok.slotIndex })
+                }
+              }
+            } catch {}
+          }}>
             <div className="pile-title" id="pile_safe_bank_title">Safe (bank)</div>
             <div className="pile-count" id="pile_safe_bank_count">💰 <AnimatedNumber value={bankMoney} /></div>
-            <MoneyThumbnails count={bankMoney} />
+            <MoneyThumbnails count={bankMoney} draggableTokens={true} owner="bank" />
           </div>
-          <div className="pile-box pile-rejected" id="pile_reserve" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onShelfDrop}>
+          <div className="pile-box pile-reserve" id="pile_reserve" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onShelfDrop}>
             <div className="pile-title" id="pile_reserve_title">Reserve</div>
             <div className="pile-count" id="pile_reserve_count">{view?.shared?.shelfCount ?? 0}</div>
             <div className="shelf-list">

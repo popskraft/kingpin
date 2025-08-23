@@ -391,6 +391,59 @@ async def join_room(sid, data):
 
 
 @sio.event
+async def remove_op_shield(sid, data):
+    """Remove a shield from the opponent's slot without refunding money to them.
+    Used to simulate the opponent destroying a defender token.
+    Client sends: { slotIndex }
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    r = rooms.get(room)
+    if not r:
+        return
+    st: GameState = r["state"]
+    op_pid = "P2" if pid == "P1" else "P1"
+    try:
+        si = int(data.get("slotIndex", -1))
+    except Exception:
+        return
+    if si < 0 or si >= len(st.players[op_pid].slots):
+        return
+    slot = st.players[op_pid].slots[si]
+    if slot.muscles > 0:
+        slot.muscles -= 1
+        _log(room, "token", f"{pid} destroyed 1 shield on {op_pid}'s slot {si+1}", actor=pid)
+        await _emit_views(room)
+
+
+@sio.event
+async def cursor(sid, data):
+    """Relay normalized cursor coordinates within the board to the other player in the same room.
+    Client sends: { room, x, y, visible }
+    x,y are expected in [0,1]. visible toggles rendering on receiver side.
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info.get("room")
+    pid = info.get("pid")
+    if not room:
+        return
+    try:
+        x = float(data.get("x", 0))
+        y = float(data.get("y", 0))
+        visible = bool(data.get("visible", True))
+    except Exception:
+        x, y, visible = 0.0, 0.0, False
+    payload = {"pid": pid, "x": max(0.0, min(1.0, x)), "y": max(0.0, min(1.0, y)), "visible": visible}
+    # Broadcast to the room except the sender
+    await sio.emit("cursor", payload, room=room, skip_sid=sid)
+
+
+@sio.event
 async def disconnect(sid):
     info = sid_index.pop(sid, None)
     if not info:

@@ -30,7 +30,9 @@ button.danger { border-color: #5a2a2a; background: #2a1616; color: #ffd7d7; }
 button.danger:hover { background: #3a1f1f; border-color: #7a3a3a; }
 
 .main { display: grid; grid-template-columns: 1fr 260px; gap: 12px; padding: 12px; }
-.board { display: flex; flex-direction: column; gap: 18px; }
+.board { position: relative; display: flex; flex-direction: column; gap: 18px; }
+.op-cursor { position: absolute; width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; border-radius: 50%; background: #ff3e7f; box-shadow: 0 0 0 2px rgba(255,62,127,0.35), 0 2px 6px rgba(0,0,0,0.4); pointer-events: none; z-index: 20; }
+.op-cursor::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin-left: -2px; margin-top: -2px; background: #fff; border-radius: 50%; opacity: .9; }
 .sidebar { background: var(--panel); border: 1px solid #2a3240; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 
 .pile-box { background: var(--panel-2); border: 1px solid #2a3240; border-radius: 8px; padding: 10px; }
@@ -59,8 +61,8 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 
 .slots-grid { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 6px; }
 .slot { position: relative; width: var(--card-w); height: calc(var(--card-h) + 32px); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
-.shield-thumbs { width: 100%; height: 12px; display: flex; align-items: center; justify-content: stretch; gap: 4px; margin-top: 2px; padding: 0 2px; }
-.shield-thumb { flex: 1 1 0; height: 8px; border-radius: 3px; border: 1px dashed rgba(203,213,225,0.25); background: rgba(255,255,255,0.03); transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.shield-thumbs { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 2px; padding: 0 2px; align-items: center; }
+.shield-thumb { width: 100%; aspect-ratio: 4 / 3; border-radius: 4px; border: 1px dashed rgba(203,213,225,0.25); background: rgba(255,255,255,0.03); transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
 .shield-thumb.filled { background: linear-gradient(180deg, rgba(62,166,255,0.95), rgba(62,166,255,0.65)); border: 1px solid #335270; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
 .shield-thumb.empty { border-color: rgba(148,163,184,0.25); background: rgba(255,255,255,0.02); }
 .slot-header { height: 28px; display: flex; align-items: center; justify-content: center; }
