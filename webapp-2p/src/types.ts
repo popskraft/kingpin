@@ -39,6 +39,14 @@ export type LogEntry = {
   active?: 'P1' | 'P2' | null
 }
 
+export type AttackMeta = {
+  attacker: 'P1' | 'P2'
+  attackerSlots: number[]
+  target: { pid: 'P1' | 'P2', slot: number }
+  plan: { removeShields: number, destroyCard: boolean }
+  status: 'planning' | 'proposed'
+} | null
+
 export type SharedView = {
   deckCount: number
   shelfCount: number
@@ -61,5 +69,6 @@ export type ViewState = {
       phase: string
     }
     log?: LogEntry[]
+    attack?: AttackMeta
   }
 }

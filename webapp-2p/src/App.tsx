@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
-import type { ViewState, Card, Slot, LogEntry } from './types'
+import type { ViewState, Card, Slot, LogEntry, AttackMeta } from './types'
 
 const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL || 'http://localhost:8000'
 const ROOM = (import.meta as any).env?.VITE_ROOM || 'demo'
@@ -129,8 +129,8 @@ function AnimatedNumber({ value, className }: { value: number, className?: strin
   return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
 }
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom }:
-  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void }): JSX.Element {
+function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard }:
+  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void }): JSX.Element {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
@@ -169,7 +169,7 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
     e.dataTransfer.setData('application/json', JSON.stringify({ from: 'slot', fromIndex: index }))
   }
   return (
-    <div className="slot" onDragOver={handleDragOver} onDrop={handleDrop}>
+    <div className={`slot ${extraClassName || ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>
       <div className="shield-thumbs" title={`Shield defenders: ${Math.min(4, Math.max(0, slot.muscles))}`} onDragOver={(e) => e.preventDefault()}>
         {Array.from({ length: 4 }).map((_, i) => {
           const filled = i < Math.min(4, Math.max(0, slot.muscles))
@@ -201,7 +201,7 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
         )}
       </div>
       <div className="slot-inner">
-        <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDoubleClick={onFlip}>
+        <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDoubleClick={onFlip} onClick={onClickCard}>
           <CardView card={slot.card} faceUp={slot.face_up} />
         </div>
       </div>
@@ -217,6 +217,15 @@ export default function App(): JSX.Element {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [oppCursor, setOppCursor] = useState<{ x: number, y: number, visible: boolean }>({ x: 0.5, y: 0.5, visible: false })
   const lastSent = useRef<number>(0)
+  // Attack selection state (client-side)
+  const [selectedAttackers, setSelectedAttackers] = useState<number[]>([])
+  // Local attack modal state
+  const [localAttackModal, setLocalAttackModal] = useState<{
+    targetSlot: number
+    targetPid: string
+    markedShields: number[]
+    cardMarkedForDestroy: boolean
+  } | null>(null)
 
   // Title reflects current seat to differentiate tabs
   useEffect(() => {
@@ -272,6 +281,9 @@ export default function App(): JSX.Element {
   const opp = view?.opponent
   const turn = view?.meta?.turn
   const isYourTurn = seat != null && turn?.active === seat
+  const attack: AttackMeta | undefined = view?.meta?.attack
+  const isAttacker = attack && seat ? attack.attacker === seat : false
+  const isTarget = attack && seat ? attack.target.pid === seat : false
 
   // Shared bank: total 36 tokens across both players
   const TOTAL_MONEY_TOKENS = 36
@@ -306,6 +318,13 @@ export default function App(): JSX.Element {
   }
   const endTurn = () => socket?.emit('end_turn', { room: ROOM })
 
+  // Attack socket helpers
+  const emitStartAttack = (attackerSlots: number[], targetSlot: number) => socket?.emit('start_attack', { room: ROOM, attackerSlots, targetSlot })
+  const emitUpdatePlan = (patch: Partial<{ removeShields: number, destroyCard: boolean }>) => socket?.emit('attack_update_plan', { room: ROOM, ...patch })
+  const emitPropose = () => socket?.emit('attack_propose', { room: ROOM })
+  const emitAccept = () => socket?.emit('attack_accept', { room: ROOM })
+  const emitCancel = () => socket?.emit('attack_cancel', { room: ROOM })
+
   const visibleYou = view?.meta?.visible_slots?.you ?? 6
 
   const emitCursor = (x: number, y: number, visible = true) => {
@@ -324,6 +343,74 @@ export default function App(): JSX.Element {
     emitCursor(Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y)), true)
   }
   const onBoardMouseLeave = () => emitCursor(0, 0, false)
+
+  // Attack selection handlers
+  const toggleSelectAttacker = (i: number) => {
+    if (!you?.board?.[i]?.card) return
+    const atk = (you?.board?.[i]?.card?.atk ?? 0)
+    if (atk <= 0) return
+    setSelectedAttackers((prev) => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])
+  }
+  const clearAttackSelection = () => { 
+    setSelectedAttackers([])
+    setLocalAttackModal(null)
+  }
+  const handleTargetClick = (i: number) => {
+    if (selectedAttackers.length === 0) return
+    // Open local attack modal instead of immediately emitting
+    const targetPid = opp?.id || 'opponent'
+    setLocalAttackModal({
+      targetSlot: i,
+      targetPid,
+      markedShields: [],
+      cardMarkedForDestroy: false
+    })
+  }
+
+  // Local attack modal handlers
+  const toggleShieldMark = (shieldIndex: number) => {
+    if (!localAttackModal) return
+    setLocalAttackModal(prev => {
+      if (!prev) return null
+      const marked = prev.markedShields.includes(shieldIndex)
+      return {
+        ...prev,
+        markedShields: marked 
+          ? prev.markedShields.filter(i => i !== shieldIndex)
+          : [...prev.markedShields, shieldIndex]
+      }
+    })
+  }
+
+  const toggleCardDestroy = () => {
+    if (!localAttackModal) return
+    setLocalAttackModal(prev => prev ? { ...prev, cardMarkedForDestroy: !prev.cardMarkedForDestroy } : null)
+  }
+
+  const confirmAttack = () => {
+    if (!localAttackModal) return
+    // Send attack to server with marked shields and destroy flag
+    emitStartAttack(selectedAttackers.slice().sort((a,b) => a-b), localAttackModal.targetSlot)
+    
+    // Wait a bit then send the plan and propose
+    setTimeout(() => {
+      emitUpdatePlan({ 
+        removeShields: localAttackModal.markedShields.length, 
+        destroyCard: localAttackModal.cardMarkedForDestroy 
+      })
+      // Auto-propose after setting plan
+      setTimeout(() => {
+        emitPropose()
+      }, 100)
+    }, 100)
+    
+    // Clear local state
+    clearAttackSelection()
+  }
+
+  const cancelLocalAttack = () => {
+    setLocalAttackModal(null)
+  }
 
   const handleDropToSlot = (slotIndex: number, from: DragPayload) => {
     if (!from) return
@@ -395,6 +482,7 @@ export default function App(): JSX.Element {
           <button id="btn_shuffle" onClick={shuffleDeck}>Shuffle</button>
           <button id="btn_draw_top" onClick={handleDraw}>Draw</button>
           <button id="btn_end_turn" onClick={endTurn} disabled={!isYourTurn} title="End turn">End Turn</button>
+          {selectedAttackers.length > 0 && <button id="btn_clear_selection" onClick={clearAttackSelection} disabled={!!attack || !!localAttackModal} title="Clear attack selection">Clear Selection ({selectedAttackers.length})</button>}
           <button id="btn_reset" className="danger" onClick={resetRoom} title="Reset room (drop progress)">Reset</button>
         </div>
       </header>
@@ -409,7 +497,15 @@ export default function App(): JSX.Element {
             <OpponentHandThumbnails count={opp?.handCount ?? 0} />
             <div className="slots-grid" id="opp_slots">
               {opp?.board?.map((s: Slot, i: number) => (
-                <SlotView key={i} slot={s} index={i} editable={false} owner="opponent" />
+                <SlotView
+                  key={i}
+                  slot={s}
+                  index={i}
+                  editable={false}
+                  owner="opponent"
+                  extraClassName={selectedAttackers.length > 0 && s.card ? 'targetable' : ''}
+                  onClickCard={() => handleTargetClick(i)}
+                />
               ))}
             </div>
             <div className="tokens-row" id="opp_tokens_row">
@@ -427,6 +523,8 @@ export default function App(): JSX.Element {
                   index={i}
                   editable
                   owner="you"
+                  extraClassName={selectedAttackers.includes(i) ? 'attacker-selected' : ''}
+                  onClickCard={() => toggleSelectAttacker(i)}
                   onFlip={() => handleFlip(i)}
                   onDropToSlot={(from) => handleDropToSlot(i, from)}
                   canAddShield={(yourMoney ?? 0) > 0}
@@ -524,6 +622,170 @@ export default function App(): JSX.Element {
           </div>
         </aside>
       </div>
+
+      {/* Local Attack Modal */}
+      {localAttackModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal attack-modal">
+            <div className="modal-header">
+              <div className="modal-title">Планирование атаки</div>
+              <div className="modal-sub">Атакующие: {selectedAttackers.map(i => `#${i + 1}`).join(', ')} → Цель: слот {localAttackModal.targetSlot + 1}</div>
+            </div>
+            <div className="modal-content">
+              {/* Target card with exact replica */}
+              <div className="modal-card">
+                <div className="card-wrap" style={{ opacity: localAttackModal.cardMarkedForDestroy ? 0.5 : 1 }}>
+                  <CardView 
+                    card={opp?.board?.[localAttackModal.targetSlot]?.card ?? null} 
+                    faceUp={opp?.board?.[localAttackModal.targetSlot]?.face_up ?? false} 
+                  />
+                </div>
+                {/* Interactive shields */}
+                <div className="shield-thumbs modal-shields">
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const slotData = opp?.board?.[localAttackModal.targetSlot]
+                    const muscles = Math.min(4, Math.max(0, slotData?.muscles ?? 0))
+                    const filled = i < muscles
+                    const marked = localAttackModal.markedShields.includes(i)
+                    return (
+                      <div 
+                        key={i} 
+                        className={`shield-thumb ${filled ? 'filled' : 'empty'} ${marked ? 'marked-for-removal' : ''}`}
+                        style={{ 
+                          opacity: marked ? 0.5 : 1,
+                          cursor: filled ? 'pointer' : 'default'
+                        }}
+                        onClick={filled ? () => toggleShieldMark(i) : undefined}
+                        title={filled ? (marked ? 'Отменить удаление щита' : 'Отметить щит для удаления') : ''}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Attack summary */}
+              <div className="attackers">
+                <div className="label">Атакующие карты</div>
+                <div className="list">
+                  {selectedAttackers.map(i => {
+                    const card = you?.board?.[i]?.card
+                    return card ? `#${i + 1}: ${card.name} (ATK: ${card.atk})` : `#${i + 1}`
+                  }).join(', ')}
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="modal-controls">
+                <div className="control-row">
+                  <div className="info">
+                    {localAttackModal.markedShields.length > 0 && `Щиты к удалению: ${localAttackModal.markedShields.length}`}
+                    {localAttackModal.cardMarkedForDestroy && ' • Карта отмечена для уничтожения'}
+                    {localAttackModal.markedShields.length === 0 && !localAttackModal.cardMarkedForDestroy && 'Выберите щиты для удаления или отметьте карту для уничтожения'}
+                  </div>
+                </div>
+                
+                <div className="control-row">
+                  <button 
+                    className={`toggle ${localAttackModal.cardMarkedForDestroy ? 'on' : ''}`} 
+                    onClick={toggleCardDestroy}
+                  >
+                    {localAttackModal.cardMarkedForDestroy ? '✓ Карта будет уничтожена' : 'Уничтожить карту'}
+                  </button>
+                </div>
+
+                <div className="control-row">
+                  <button 
+                    onClick={confirmAttack} 
+                    disabled={localAttackModal.markedShields.length === 0 && !localAttackModal.cardMarkedForDestroy}
+                    className="primary"
+                  >
+                    Отправить предложение
+                  </button>
+                  <button onClick={cancelLocalAttack} className="danger">
+                    Отменить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Server Attack Modal (for opponent responses) */}
+      {attack && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal attack-modal">
+            <div className="modal-header">
+              <div className="modal-title">Подтверждение атаки</div>
+              <div className="modal-sub">Атакующий: {attack.attacker} → Цель: {attack.target.pid} слот {attack.target.slot + 1}</div>
+            </div>
+            <div className="modal-content">
+              {/* Target preview */}
+              <div className="modal-card">
+                <div className="card-wrap" style={{ opacity: attack.plan.destroyCard ? 0.5 : 1 }}>
+                  {attack.target.pid === you?.id ? (
+                    <CardView card={you?.board?.[attack.target.slot]?.card ?? null} faceUp={you?.board?.[attack.target.slot]?.face_up ?? false} />
+                  ) : (
+                    <CardView card={opp?.board?.[attack.target.slot]?.card ?? null} faceUp={opp?.board?.[attack.target.slot]?.face_up ?? false} />
+                  )}
+                </div>
+                {/* Shields with marked removals */}
+                <div className="shield-thumbs modal-shields">
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const slotData = attack.target.pid === you?.id ? you?.board?.[attack.target.slot] : opp?.board?.[attack.target.slot]
+                    const muscles = Math.min(4, Math.max(0, slotData?.muscles ?? 0))
+                    const filled = i < muscles
+                    const marked = attack.plan.removeShields > 0 && i < attack.plan.removeShields
+                    return (
+                      <div 
+                        key={i} 
+                        className={`shield-thumb ${filled ? 'filled' : 'empty'} ${marked ? 'marked' : ''}`}
+                        style={{ opacity: marked ? 0.5 : 1 }}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Attackers list */}
+              <div className="attackers">
+                <div className="label">Атакующие</div>
+                <div className="list">{attack.attackerSlots.map(i => `#${i + 1}`).join(', ')}</div>
+              </div>
+
+              {/* Controls for defender */}
+              <div className="modal-controls">
+                {!isAttacker ? (
+                  <>
+                    <div className="control-row">
+                      <div className="info">
+                        {attack.status === 'planning' ? 'Ожидание предложения от атакующего...' : 
+                         attack.plan.destroyCard ? 'Атакующий предлагает уничтожить эту карту.' : 
+                         `Атакующий предлагает удалить ${attack.plan.removeShields} щит(ов).`}
+                      </div>
+                    </div>
+                    <div className="control-row">
+                      <button 
+                        onClick={emitAccept} 
+                        disabled={attack.status !== 'proposed'}
+                        className="primary"
+                      >
+                        {attack.plan.destroyCard ? 'Согласен на уничтожение' : 'Согласен'}
+                      </button>
+                      <button onClick={emitCancel} className="danger">Отменить</button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="control-row">
+                    <div className="info">Ожидание ответа от защищающегося...</div>
+                    <button onClick={emitCancel} className="danger">Отменить</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="bottombar" id="bottombar">
         <div>Seat: {seat ?? '—'} · Source: {source.toUpperCase()} · Room: {ROOM} · Server: {SERVER_URL}</div>

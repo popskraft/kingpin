@@ -320,8 +320,11 @@ async def _emit_views(room_id: str) -> None:
         if not sid:
             continue
         view = _filtered_view(st, pid, visible_you=vs.get(pid, INIT_VISIBLE_SLOTS), visible_op=vs.get("P2" if pid == "P1" else "P1", INIT_VISIBLE_SLOTS))
+        # append ephemeral meta
+        meta = view.setdefault("meta", {})
+        meta["attack"] = r.get("attack")
         # append last N log entries
-        view.setdefault("meta", {})["log"] = (r.get("log") or [])[-50:]
+        meta["log"] = (r.get("log") or [])[-50:]
         await sio.emit("state", view, to=sid)
 
 
@@ -536,6 +539,180 @@ async def remove_shield_to_reserve(sid, data):
     p.slots[si].muscles -= give
     p.tokens.reserve_money += give
     _log(room, "token", f"{pid} returned {give} shield → +{give} money to reserve from slot {si+1}", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
+async def start_attack(sid, data):
+    """Start an attack planning session.
+    Client sends: { attackerSlots: int[], targetSlot: int }
+    Creates an ephemeral attack meta visible to both players.
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    r = rooms.get(room)
+    if not r:
+        return
+    st: GameState = r["state"]
+    try:
+        attacker_slots = list({int(i) for i in (data.get("attackerSlots") or [])})
+        attacker_slots.sort()
+        target_slot = int(data.get("targetSlot", -1))
+    except Exception:
+        return
+    if not attacker_slots:
+        return
+    op_pid = "P2" if pid == "P1" else "P1"
+    # Validate indices
+    if target_slot < 0 or target_slot >= len(st.players[op_pid].slots):
+        return
+    valid_attackers: List[int] = []
+    for i in attacker_slots:
+        if 0 <= i < len(st.players[pid].slots):
+            s = st.players[pid].slots[i]
+            try:
+                atk = int(getattr(s.card, "atk", 0)) if s.card else 0
+            except Exception:
+                atk = 0
+            if s.card is not None and atk > 0:
+                valid_attackers.append(i)
+    if not valid_attackers:
+        return
+    # Initialize attack meta
+    r["attack"] = {
+        "attacker": pid,
+        "attackerSlots": valid_attackers,
+        "target": {"pid": op_pid, "slot": target_slot},
+        "plan": {"removeShields": 0, "destroyCard": False},
+        "status": "planning",
+    }
+    _log(room, "attack", f"{pid} started attack → {op_pid} slot {target_slot+1} (attackers: {', '.join(str(i+1) for i in valid_attackers)})", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
+async def attack_update_plan(sid, data):
+    """Update the current attack plan (attacker only).
+    Client sends any of: { removeShields?: int, destroyCard?: bool }
+    """
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    r = rooms.get(room)
+    if not r or not r.get("attack"):
+        return
+    atk = r["attack"]
+    if atk.get("attacker") != pid:
+        return
+    st: GameState = r["state"]
+    target = atk.get("target") or {}
+    tpid = target.get("pid")
+    tsi = int(target.get("slot", -1))
+    if tpid not in ("P1", "P2") or tsi < 0 or tsi >= len(st.players[tpid].slots):
+        return
+    slot = st.players[tpid].slots[tsi]
+    rm = atk.setdefault("plan", {}).get("removeShields", 0)
+    dc = atk.setdefault("plan", {}).get("destroyCard", False)
+    if "removeShields" in data:
+        try:
+            rm = max(0, int(data.get("removeShields", 0)))
+        except Exception:
+            rm = 0
+        rm = min(rm, max(0, slot.muscles))
+    if "destroyCard" in data:
+        dc = bool(data.get("destroyCard", False))
+    atk["plan"] = {"removeShields": rm, "destroyCard": dc}
+    await _emit_views(room)
+
+
+@sio.event
+async def attack_propose(sid, data):
+    """Attacker proposes the current plan for opponent confirmation."""
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    r = rooms.get(room)
+    if not r or not r.get("attack"):
+        return
+    atk = r["attack"]
+    if atk.get("attacker") != pid:
+        return
+    atk["status"] = "proposed"
+    _log(room, "attack", f"{pid} proposed destruction: shields={atk.get('plan', {}).get('removeShields', 0)}, card={atk.get('plan', {}).get('destroyCard', False)}", actor=pid)
+    await _emit_views(room)
+
+
+@sio.event
+async def attack_accept(sid, data):
+    """Opponent accepts the proposed plan; apply effects and close modal."""
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    r = rooms.get(room)
+    if not r or not r.get("attack"):
+        return
+    atk = r["attack"]
+    attacker = atk.get("attacker")
+    target = atk.get("target") or {}
+    tpid = target.get("pid")
+    tsi = int(target.get("slot", -1))
+    if pid != tpid:
+        # Only the target side can accept
+        return
+    if atk.get("status") != "proposed":
+        # Require explicit proposal before accept
+        return
+    st: GameState = r["state"]
+    if tpid not in ("P1", "P2") or tsi < 0 or tsi >= len(st.players[tpid].slots):
+        return
+    slot = st.players[tpid].slots[tsi]
+    plan = atk.get("plan") or {}
+    remove_n = max(0, int(plan.get("removeShields", 0)))
+    remove_n = min(remove_n, max(0, slot.muscles))
+    destroy_card = bool(plan.get("destroyCard", False))
+    # Remove shields (bank implicitly increases as shields on board decrease)
+    if remove_n > 0:
+        slot.muscles = max(0, slot.muscles - remove_n)
+    # Destroy card (send to discard) and remove any remaining shields on that slot
+    if destroy_card and slot.card is not None:
+        card = slot.card
+        st.discard_out_of_game.append(card)
+        slot.card = None
+        slot.muscles = 0
+        _log(room, "destroy", f"{attacker} destroyed {tpid}'s {getattr(card, 'name', 'card')} on slot {tsi+1}", actor=attacker)
+    else:
+        _log(room, "attack", f"{attacker} removed {remove_n} shield(s) from {tpid}'s slot {tsi+1}", actor=attacker)
+    # Close attack session
+    r["attack"] = None
+    await _emit_views(room)
+
+
+@sio.event
+async def attack_cancel(sid, data):
+    """Cancel the current attack session (either side)."""
+    info = sid_index.get(sid)
+    if not info:
+        return
+    room = info["room"]
+    pid = info["pid"]
+    r = rooms.get(room)
+    if not r or not r.get("attack"):
+        return
+    atk = r["attack"]
+    target = (atk or {}).get("target") or {}
+    if pid not in (atk.get("attacker"), target.get("pid")):
+        return
+    r["attack"] = None
+    _log(room, "attack", f"{pid} canceled the attack", actor=pid)
     await _emit_views(room)
 
 

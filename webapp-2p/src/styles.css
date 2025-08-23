@@ -138,9 +138,63 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 }
 /* Desktop/two-column layout: add right margin so #your_hand doesn't visually touch the sidebar */
 @media (min-width: 981px) {
-  #your_hand { margin-right: 24px; }
   .board { padding-right: 16px; }
 }
 @media (max-width: 780px) {
   :root { --card-w: 140px; --card-h: 186px; }
+}
+
+/* Attack mode highlights */
+.slot.attacker-selected {
+  box-shadow: 0 0 0 2px rgba(255, 99, 132, 0.6), 0 8px 18px rgba(0,0,0,0.5);
+  outline: 2px solid rgba(255, 99, 132, 0.5);
+}
+.slot.targetable {
+  box-shadow: 0 0 0 2px rgba(62,166,255,0.6), 0 8px 18px rgba(0,0,0,0.5);
+}
+.slot.targetable .card-wrap { cursor: crosshair; }
+
+/* Modal overlay and attack modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.modal.attack-modal {
+  width: min(880px, 96vw);
+  background: var(--panel);
+  border: 1px solid #2a3240;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.attack-modal .modal-header { padding: 12px 14px; border-bottom: 1px solid #2a3240; }
+.attack-modal .modal-title { font-weight: 700; font-size: 18px; }
+.attack-modal .modal-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.attack-modal .modal-content { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 14px; }
+.attack-modal .modal-card { background: var(--panel-2); border: 1px solid #2a3240; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+.attack-modal .modal-shields { margin-top: 8px; }
+.attack-modal .shield-thumb.marked { outline: 2px dashed rgba(255, 99, 132, 0.9); box-shadow: 0 0 0 2px rgba(255, 99, 132, 0.25) inset; }
+.attack-modal .shield-thumb.marked-for-removal { outline: 2px dashed rgba(255, 99, 132, 0.9); box-shadow: 0 0 0 2px rgba(255, 99, 132, 0.25) inset; border: 2px solid #ff6384; }
+.attack-modal .shield-thumb.filled:hover { transform: scale(1.05); transition: transform 0.1s ease; }
+.attack-modal .attackers { background: var(--panel-2); border: 1px solid #2a3240; border-radius: 10px; padding: 10px; }
+.attack-modal .attackers .label { font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-size: 12px; margin-bottom: 6px; }
+.attack-modal .attackers .list { font-size: 14px; }
+.attack-modal .modal-controls { grid-column: span 1; display: flex; flex-direction: column; gap: 10px; }
+.attack-modal .control-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2); border: 1px solid #2a3240; border-radius: 10px; padding: 10px; }
+.attack-modal .control-inline { display: inline-flex; align-items: center; gap: 8px; }
+.attack-modal .control-inline .num { min-width: 24px; text-align: center; font-weight: 700; }
+.attack-modal .toggle { padding: 6px 10px; border-radius: 6px; border: 1px solid #2a3240; background: #232a36; color: var(--text); }
+.attack-modal .toggle.on { background: rgba(255, 99, 132, 0.18); border-color: #6b2e2e; color: #ffd7d7; }
+.attack-modal .primary { background: rgba(62, 166, 255, 0.18); border-color: #335270; color: #9fd6ff; }
+.attack-modal .primary:hover { background: rgba(62, 166, 255, 0.25); }
+.attack-modal .primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.attack-modal .info { font-size: 14px; color: var(--muted); font-style: italic; }
+
+@media (max-width: 760px) {
+  .attack-modal .modal-content { grid-template-columns: 1fr; }
 }
