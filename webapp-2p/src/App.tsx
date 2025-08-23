@@ -129,8 +129,8 @@ function AnimatedNumber({ value, className }: { value: number, className?: strin
   return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
 }
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield }:
-  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean }): JSX.Element {
+function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom }:
+  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void }): JSX.Element {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
@@ -145,14 +145,21 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
         return
       } catch {}
     }
-    // Token movement (money -> shield)
+    // Token movement
     const tokenData = e.dataTransfer.getData('application/x-token')
     if (tokenData) {
       try {
         const tok = JSON.parse(tokenData) as TokenDrag
+        // Money -> Shield on your slot
         if (tok.kind === 'money' && owner === 'you') {
           if (tok.owner === 'you') onTokenPlus?.()
           else if (tok.owner === 'bank') onTokenPlusFromBank?.()
+        }
+        // Shield moved between your slots
+        if (tok.kind === 'shield' && owner === 'you' && typeof tok.slotIndex === 'number') {
+          if (tok.slotIndex !== index) {
+            onReceiveShieldFrom?.(tok.slotIndex)
+          }
         }
       } catch {}
     }
@@ -418,6 +425,7 @@ export default function App(): JSX.Element {
                   onTokenPlus={() => { if ((yourMoney ?? 0) > 0) { addShield(i); removeMoney(1) } }}
                   onTokenPlusFromBank={() => { /* Temporarily route via reserve to keep bank correct */ addMoney(1); addShield(i); removeMoney(1) }}
                   onTokenMinus={() => { if ((s?.muscles ?? 0) > 0) { removeShield(i); addMoney(1) } }}
+                  onReceiveShieldFrom={(srcIndex: number) => { if (srcIndex !== i) { removeShield(srcIndex); addShield(i) } }}
                 />
               ))}
             </div>
