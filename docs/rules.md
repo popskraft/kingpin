@@ -34,7 +34,7 @@ Destroy opponent's Boss by reducing its HP to 0 or below.
 ### 1.2 Tokens (Total 40 tokens: 36 base [12 × 3 castes] + 4 additional)
 **Double-sided tokens 💰 ↔ 🛡️**:
 - **Money (💰)**: resource for purchases and enhancements
-- **Shield (🛡️)**: defensive units (HP=1, ATK=0.25). Corruption cost to bribe: 3 (gangsters, loners), 2 (authorities)
+- **Shield (🛡️)**: defensive units (HP=1, ATK=0.25). When the host card participates in an attack, each shield on it contributes +0.25 to that attack's total. Corruption cost to bribe: 3 (gangsters, loners), 2 (authorities)
 
 ### 1.3 Deck Structure
 - **18 caste cards**: 6 cards × 3 castes (gangsters, authorities, loners)
@@ -60,7 +60,7 @@ Total: 37 cards in deck (+ 3 Bosses outside deck).
 - **Caste**: caste (gangsters, authorities, loners) - intra-caste synergies
 - **Faction**: faction (heads, specialists, stormers, healers, slippery) - cross-caste synergies
 - **Defend (D)**: base shield limit (🛡️) for this card. Effective shield limit = `min(4, D + Authority_auras)`.
-- **Rage**: additional attack for all player's cards
+- **Rage**: per-card attack aura. Adds +R ATK to every attacking card you control (i.e., a combined attack of N cards gets +N×R). Stacks across multiple sources.
 - **Authority**: aura increasing shield limit of all your cards by +N while source is in play
 - **Ability**: special card abilities
 
@@ -68,8 +68,8 @@ Total: 37 cards in deck (+ 3 Bosses outside deck).
 - **ATK** — card's base attack
 - **HP** — card's health
 - **D (Defend)** — card's base shield limit; effective limit: `min(4, D + sum of Authority auras)`
-- **🛡️ (shield)** — blocks 1 damage; removed when absorbed
-- **Rage (R)** — general attack bonus for your cards
+- **S 🛡️ (shield)** — blocks 1 damage; removed when absorbed
+- **Rage (R)** — per-attacking-card bonus (+R to each attacking card; combined attacks get +N×R)
 - **Authority** — aura that increases shield limit of your cards by +N while source is in play
 - **Unbribable** — card cannot be bribed (see Glossary)
 
@@ -165,9 +165,13 @@ Note: faction cascades are disabled in this version and will be added later.
 ## 6. Combat Rules
 
 ### 6.1 Damage Calculation
-**Total damage** = card ATK + Rage (from player's cards) + ammunition (💰)
-**Damage absorption**: first 🛡️ (1 HP per token), then card HP
-**Destruction**: when HP ≤ 0 card goes to Discard Pile
+**Total damage (combined attack)** = sum of attackers' ATK + (Rage per card × number of attackers) + (0.25 × total shields on the attacking cards) + ammunition (💰, if any)
+
+Notes:
+- Rage applies per attacking card. Example: with R=1 and 2 attackers → +2 total.
+- Shield tokens contribute +0.25 each only when their host card participates in the attack.
+- **Damage absorption**: first 🛡️ (1 HP per token), then card HP.
+- **Destruction**: when HP ≤ 0 card goes to Discard Pile.
 
 ### 6.2 Combined Attacks
 - Can attack with multiple cards simultaneously

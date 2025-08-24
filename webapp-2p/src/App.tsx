@@ -855,19 +855,20 @@ export default function App(): JSX.Element {
                   const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
                   const perCardBuff = ragePerCardYou
                   const buffSum = (perCardBuff > 0 ? selectedAttackers.length * perCardBuff : 0)
-                  const totalAtk = baseSum + buffSum
+                  const shieldsOnAttackers = selectedAttackers.reduce((s, i) => s + (you?.board?.[i]?.muscles ?? 0), 0)
+                  const shieldsBonus = shieldsOnAttackers * 0.25
+                  const totalAtk = baseSum + buffSum + shieldsBonus
                   // Defender HP
                   const tSlot = localAttackModal.targetSlot
                   const defSlot = opp?.board?.[tSlot]
                   const defCard = defSlot?.card
                   const baseHP = defCard?.hp ?? 0
                   const shields = defSlot?.muscles ?? 0
-                  const defBonus = defendGlobalOpp
-                  const totalHP = baseHP + shields + defBonus
+                  const totalHP = baseHP + shields
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${selectedAttackers.length}×${perCardBuff}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{defBonus > 0 ? ` + ${defBonus}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${selectedAttackers.length}×${perCardBuff}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
@@ -967,7 +968,9 @@ export default function App(): JSX.Element {
                   const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
                   const perCardBuff = calcRagePerCard(attBoard)
                   const buffSum = (perCardBuff > 0 ? attack.attackerSlots.length * perCardBuff : 0)
-                  const totalAtk = baseSum + buffSum
+                  const shieldsOnAttackers = attack.attackerSlots.reduce((s, i) => s + (attBoard?.[i]?.muscles ?? 0), 0)
+                  const shieldsBonus = shieldsOnAttackers * 0.25
+                  const totalAtk = baseSum + buffSum + shieldsBonus
 
                   // Defender HP
                   const tSlot = attack.target.slot
@@ -975,13 +978,12 @@ export default function App(): JSX.Element {
                   const defCard = defSlot?.card
                   const baseHP = defCard?.hp ?? 0
                   const shields = defSlot?.muscles ?? 0
-                  const defBonus = calcGlobalDefend(defBoard)
-                  const totalHP = baseHP + shields + defBonus
+                  const totalHP = baseHP + shields
 
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${attack.attackerSlots.length}×${perCardBuff}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{defBonus > 0 ? ` + ${defBonus}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${attack.attackerSlots.length}×${perCardBuff}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
