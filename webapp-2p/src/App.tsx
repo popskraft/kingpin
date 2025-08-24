@@ -139,8 +139,8 @@ function AnimatedNumber({ value, className }: { value: number, className?: strin
   return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
 }
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard }:
-  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void }): JSX.Element {
+function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard, onHoverStart, onHoverEnd, onDragAnyStart, onDragAnyEnd, onSlotDragStart }:
+  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void, onHoverStart?: () => void, onHoverEnd?: () => void, onDragAnyStart?: () => void, onDragAnyEnd?: () => void, onSlotDragStart?: (index: number) => void }): JSX.Element {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
@@ -176,6 +176,8 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
   }
   const draggable = editable && !!slot.card
   const handleDragStart = (e: React.DragEvent) => {
+    onDragAnyStart?.()
+    onSlotDragStart?.(index)
     e.dataTransfer.setData('application/json', JSON.stringify({ from: 'slot', fromIndex: index }))
   }
   return (
@@ -211,7 +213,7 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
         )}
       </div>
       <div className="slot-inner">
-        <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDoubleClick={onFlip} onClick={onClickCard}>
+        <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDragEnd={onDragAnyEnd} onDoubleClick={onFlip} onClick={onClickCard} onMouseEnter={onHoverStart} onMouseLeave={onHoverEnd}>
           <CardView card={slot.card} faceUp={slot.face_up} />
         </div>
       </div>
@@ -236,6 +238,44 @@ export default function App(): JSX.Element {
     markedShields: number[]
     cardMarkedForDestroy: boolean
   } | null>(null)
+
+  // Hover preview side modal state
+  const [preview, setPreview] = useState<{ card: Card, faceUp: boolean } | null>(null)
+  const previewTimerRef = useRef<number | null>(null)
+  const previewSuppressedRef = useRef<boolean>(false)
+
+  // Dragging card origin to highlight valid drop zones
+  const [dragCardFrom, setDragCardFrom] = useState<DragPayload | null>(null)
+
+  const handlePreviewHoverStart = (card: Card | null, faceUp: boolean) => {
+    if (!card) return
+    if (previewSuppressedRef.current) return
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current)
+      previewTimerRef.current = null
+    }
+    previewTimerRef.current = window.setTimeout(() => {
+      setPreview({ card, faceUp })
+    }, 1500)
+  }
+
+  const handlePreviewHoverEnd = () => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current)
+    }
+    previewTimerRef.current = null
+    setPreview(null)
+    previewSuppressedRef.current = false
+  }
+
+  const forceClosePreview = () => {
+    setPreview(null)
+    previewSuppressedRef.current = true
+  }
+
+  // Turn "no moves" alert state
+  const [turnAlert, setTurnAlert] = useState(false)
+  const turnAlertDismissedRef = useRef<number | null>(null)
 
   // Title reflects current seat to differentiate tabs
   useEffect(() => {
@@ -331,6 +371,32 @@ export default function App(): JSX.Element {
   const bankMoney = Math.max(0, TOTAL_MONEY_TOKENS - yourMoney - oppMoney - totalYourShields - totalOppShields)
   // Your actual reserve (spendable money)
   const availableMoney = Math.max(0, (yourMoney ?? 0))
+
+  // Auto prompt to end turn if no obvious moves remain
+  useEffect(() => {
+    if (!isYourTurn || !turn) { setTurnAlert(false); return }
+    if (attack) { setTurnAlert(false); return }
+    if (turnAlertDismissedRef.current === turn.number) return
+
+    const boardYou = you?.board ?? []
+    const boardOpp = opp?.board ?? []
+    const hasEmptySlot = boardYou.some(sl => !sl.card)
+    const hasCardOnBoard = boardYou.some(sl => !!sl.card)
+    const canPlayFromHand = (you?.hand?.length ?? 0) > 0 && hasEmptySlot
+    const canRelocate = hasCardOnBoard && hasEmptySlot
+    const canAddShieldMove = (yourMoney ?? 0) > 0
+    const canRemoveShieldMove = boardYou.some(sl => (sl?.muscles ?? 0) > 0)
+    const canAttackMove = boardYou.some(sl => (sl.card?.atk ?? 0) > 0) && boardOpp.some(sl => !!sl.card)
+    const canDrawMove = (view?.shared?.deckCount ?? 0) > 0
+
+    const hasMoves = canPlayFromHand || canRelocate || canAddShieldMove || canRemoveShieldMove || (canAttackMove && !localAttackModal) || canDrawMove
+    setTurnAlert(!hasMoves)
+  }, [isYourTurn, turn?.number, you, opp, view?.shared?.deckCount, yourMoney, attack, localAttackModal])
+
+  const dismissTurnAlert = () => {
+    setTurnAlert(false)
+    if (turn?.number != null) turnAlertDismissedRef.current = turn.number
+  }
 
   const handleDraw = () => socket?.emit('draw', { room: ROOM })
   const handleFlip = (i: number) => socket?.emit('flip_card', { room: ROOM, slotIndex: i })
@@ -448,6 +514,7 @@ export default function App(): JSX.Element {
   }
 
   const handleDropToSlot = (slotIndex: number, from: DragPayload) => {
+    setDragCardFrom(null)
     if (!from) return
     if (from.from === 'hand') return moveFromHandToSlot(from.fromIndex, slotIndex)
     if (from.from === 'slot') return moveFromSlotToSlot(from.fromIndex, slotIndex)
@@ -455,10 +522,14 @@ export default function App(): JSX.Element {
   }
 
   const onHandDragStart = (i: number, e: React.DragEvent<HTMLDivElement>) => {
+    handlePreviewHoverEnd()
+    setDragCardFrom({ from: 'hand', fromIndex: i })
     e.dataTransfer.setData('application/json', JSON.stringify({ from: 'hand', fromIndex: i }))
   }
 
   const onShelfDragStart = (i: number, e: React.DragEvent<HTMLDivElement>) => {
+    handlePreviewHoverEnd()
+    setDragCardFrom({ from: 'shelf', fromIndex: i })
     e.dataTransfer.setData('application/json', JSON.stringify({ from: 'shelf', fromIndex: i }))
   }
 
@@ -473,6 +544,7 @@ export default function App(): JSX.Element {
         socket?.emit('move_card', { room: ROOM, from: 'shelf', to: 'hand', fromIndex: from.fromIndex })
       }
     } catch {}
+    setDragCardFrom(null)
   }
 
   const onDiscardDrop = (e: React.DragEvent) => {
@@ -486,6 +558,7 @@ export default function App(): JSX.Element {
         socket?.emit('move_card', { room: ROOM, from: 'slot', to: 'discard', fromIndex: from.fromIndex })
       }
     } catch {}
+    setDragCardFrom(null)
   }
 
   const onShelfDrop = (e: React.DragEvent) => {
@@ -499,6 +572,7 @@ export default function App(): JSX.Element {
         socket?.emit('move_card', { room: ROOM, from: 'slot', to: 'shelf', fromIndex: from.fromIndex })
       }
     } catch {}
+    setDragCardFrom(null)
   }
 
   return (
@@ -540,6 +614,9 @@ export default function App(): JSX.Element {
                   owner="opponent"
                   extraClassName={selectedAttackers.length > 0 && s.card ? 'targetable' : ''}
                   onClickCard={() => handleTargetClick(i)}
+                  onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up)}
+                  onHoverEnd={handlePreviewHoverEnd}
+                  onDragAnyStart={handlePreviewHoverEnd}
                 />
               ))}
             </div>
@@ -558,7 +635,13 @@ export default function App(): JSX.Element {
                   index={i}
                   editable
                   owner="you"
-                  extraClassName={selectedAttackers.includes(i) ? 'attacker-selected' : ''}
+                  extraClassName={`${selectedAttackers.includes(i) ? 'attacker-selected' : ''} ${(
+                    !!dragCardFrom &&
+                    !s.card &&
+                    ((((dragCardFrom as DragPayload).from === 'slot') && (dragCardFrom as DragPayload).fromIndex !== i) ||
+                     (dragCardFrom as DragPayload).from === 'hand' ||
+                     (dragCardFrom as DragPayload).from === 'shelf')
+                  ) ? 'drop-highlight' : ''}`}
                   onClickCard={() => toggleSelectAttacker(i)}
                   onFlip={() => handleFlip(i)}
                   onDropToSlot={(from) => handleDropToSlot(i, from)}
@@ -574,15 +657,28 @@ export default function App(): JSX.Element {
                     if ((s?.muscles ?? 0) > 0) { removeShieldToReserve(i) }
                   }}
                   onReceiveShieldFrom={(srcIndex: number) => { if (srcIndex !== i) { removeShieldOnly(srcIndex); addShieldOnly(i) } }}
+                  onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up)}
+                  onHoverEnd={handlePreviewHoverEnd}
+                  onDragAnyStart={handlePreviewHoverEnd}
+                  onSlotDragStart={(idx: number) => { handlePreviewHoverEnd(); setDragCardFrom({ from: 'slot', fromIndex: idx }) }}
+                  onDragAnyEnd={() => setDragCardFrom(null)}
                 />
               ))}
             </div>
 
-            <div className="hand" id="your_hand" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onHandDrop}>
+            <div className={`hand ${dragCardFrom && (((dragCardFrom as DragPayload).from === 'slot') || ((dragCardFrom as DragPayload).from === 'shelf')) ? 'drop-highlight' : ''}`} id="your_hand" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onHandDrop}>
               <div className="hand-title" id="your_hand_title">Your Hand ({you?.hand?.length ?? 0})</div>
               <div className="hand-cards" id="your_hand_cards">
                 {you?.hand?.map((c: Card, i: number) => (
-                  <div key={c.id + '_' + i} className="card-wrap" draggable onDragStart={(e: React.DragEvent<HTMLDivElement>) => onHandDragStart(i, e)}>
+                  <div 
+                    key={c.id + '_' + i} 
+                    className="card-wrap" 
+                    draggable 
+                    onDragStart={(e: React.DragEvent<HTMLDivElement>) => onHandDragStart(i, e)}
+                    onDragEnd={() => setDragCardFrom(null)}
+                    onMouseEnter={() => handlePreviewHoverStart(c, true)}
+                    onMouseLeave={handlePreviewHoverEnd}
+                  >
                     <CardView card={c} faceUp={true} />
                   </div>
                 ))}
@@ -627,12 +723,12 @@ export default function App(): JSX.Element {
             {/* Do not allow dragging tokens from bank to avoid reserve/bank changes during internal distribution */}
             <MoneyThumbnails count={bankMoney} draggableTokens={false} owner="bank" />
           </div>
-          <div className="pile-box pile-reserve" id="pile_reserve" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onShelfDrop}>
+          <div className={`pile-box pile-reserve ${dragCardFrom && (((dragCardFrom as DragPayload).from === 'hand') || ((dragCardFrom as DragPayload).from === 'slot')) ? 'drop-highlight' : ''}`} id="pile_reserve" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onShelfDrop}>
             <div className="pile-title" id="pile_reserve_title">Reserve pile</div>
             <div className="pile-count" id="pile_reserve_count">{view?.shared?.shelfCount ?? 0}</div>
             <div className="shelf-list">
               {view?.shared?.shelf?.map((c, i) => (
-                <div key={c.id + '_' + i} className="shelf-item" draggable onDragStart={(e: React.DragEvent<HTMLDivElement>) => onShelfDragStart(i, e)} title={c.notes || c.name}>
+                <div key={c.id + '_' + i} className="shelf-item" draggable onDragStart={(e: React.DragEvent<HTMLDivElement>) => onShelfDragStart(i, e)} onDragEnd={() => setDragCardFrom(null)} title={c.notes || c.name} onMouseEnter={() => handlePreviewHoverStart(c, true)} onMouseLeave={handlePreviewHoverEnd}>
                   <div className="shelf-card-name">{c.name}</div>
                   {c.caste && <div className="shelf-card-caste">{c.caste}</div>}
                   {c.faction && <div className="shelf-card-faction">{c.faction}</div>}
@@ -652,14 +748,8 @@ export default function App(): JSX.Element {
               ))}
             </div>
           </div>
-          <div className="pile-box" id="legend_box">
-            <div className="pile-title" id="legend_title">Legend</div>
-            <div className="legend-content" id="legend_content">
-              <div>• Bank = Golden fund (shared {TOTAL_MONEY_TOKENS} tokens)</div>
-              <div>• Draw pile, Reserve pile, Discard pile — standardized names</div>
-            </div>
-          </div>
-          <div className="pile-box pile-discard" id="pile_discard" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onDiscardDrop}>
+          {/* Legend removed as per requirements */}
+          <div className={`pile-box pile-discard ${dragCardFrom && (((dragCardFrom as DragPayload).from === 'hand') || ((dragCardFrom as DragPayload).from === 'slot')) ? 'drop-highlight' : ''}`} id="pile_discard" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onDiscardDrop}>
             <div className="pile-title" id="pile_discard_title">Discard pile</div>
             <div className="pile-count" id="pile_discard_count">{view?.shared?.discardCount ?? 0}</div>
           </div>
@@ -676,6 +766,35 @@ export default function App(): JSX.Element {
           </div>
         </aside>
       </div>
+
+      {/* Side Card Preview Modal */}
+      {preview && (
+        <div className="side-modal" role="dialog" aria-modal="false">
+          <div className="side-modal-header">
+            <div className="modal-title">{preview.card.name}</div>
+            <button className="close-btn" aria-label="Close" onClick={forceClosePreview}>×</button>
+          </div>
+          <div className="side-modal-content">
+            <div className="modal-card">
+              <div className="card-wrap">
+                <CardView card={preview.card} faceUp={preview.faceUp} />
+              </div>
+            </div>
+            <div className="preview-props">
+              <div className="prop"><b>Тип:</b> {preview.card.type || '—'}</div>
+              <div className="prop"><b>Фракция:</b> {preview.card.faction || '—'}</div>
+              <div className="prop"><b>Каста:</b> {preview.card.caste || '—'}</div>
+              <div className="prop"><b>HP:</b> {preview.card.hp ?? 0}</div>
+              <div className="prop"><b>ATK:</b> {preview.card.atk ?? 0}</div>
+              <div className="prop"><b>D:</b> {preview.card.d ?? 0}</div>
+              {(preview.card.rage ?? 0) > 0 && <div className="prop"><b>Rage:</b> {preview.card.rage}</div>}
+              {(preview.card.price ?? 0) > 0 && <div className="prop"><b>Price:</b> {preview.card.price}</div>}
+              {(preview.card.corruption ?? 0) > 0 && <div className="prop"><b>Corruption:</b> {preview.card.corruption}</div>}
+              {preview.card.notes && <div className="prop"><b>Примечания:</b> {preview.card.notes}</div>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Local Attack Modal */}
       {localAttackModal && (
@@ -896,6 +1015,29 @@ export default function App(): JSX.Element {
                     <button onClick={emitCancel} className="danger">Отменить</button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No-moves Turn Alert */}
+      {turnAlert && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal attack-modal turn-modal">
+            <div className="modal-header">
+              <div className="modal-title">Нет доступных ходов?</div>
+              <div className="modal-sub">Похоже, у вас закончились возможные действия.</div>
+            </div>
+            <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="calc-block">
+                <div className="calc-row">Вы можете закончить ход или продолжить, если хотите перепроверить.</div>
+              </div>
+              <div className="modal-controls">
+                <div className="control-row">
+                  <button className="primary" onClick={() => { setTurnAlert(false); endTurn() }}>Закончить ход</button>
+                  <button onClick={dismissTurnAlert}>Продолжить</button>
+                </div>
               </div>
             </div>
           </div>

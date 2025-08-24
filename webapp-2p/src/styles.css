@@ -159,6 +159,16 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 .slot.targetable .card-wrap { cursor: crosshair; }
 
 /* Modal overlay and attack modal */
+.slot.drop-highlight {
+  outline: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 0 18px rgba(255,255,255,0.15) inset;
+}
+.hand.drop-highlight,
+.pile-box.drop-highlight {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.22), inset 0 0 18px rgba(255,255,255,0.12);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -202,3 +212,58 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 @media (max-width: 760px) {
   .attack-modal .modal-content { grid-template-columns: 1fr; }
 }
+
+/* Turn alert modal (reuses attack modal styles, but narrower) */
+.turn-modal { width: min(520px, 96vw); }
+
+/* Side Card Preview Modal (right dock) */
+.side-modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: clamp(320px, 25vw, 520px);
+  background: var(--panel);
+  border-left: 1px solid #2a3240;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4) inset, -12px 0 24px rgba(0,0,0,0.45);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+}
+.side-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #2a3240;
+}
+.side-modal .modal-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+.side-modal .close-btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid #2a3240;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.side-modal .close-btn:hover { border-color: var(--accent); }
+.side-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+.side-modal .modal-card {
+  background: var(--panel-2);
+  border: 1px solid #2a3240;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+}
+.preview-props { font-size: 1rem; line-height: 1.35; color: var(--text); }
+.preview-props .prop { margin-bottom: 6px; }
