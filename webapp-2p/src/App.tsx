@@ -357,8 +357,73 @@ export default function App(): JSX.Element {
     return base + bossBonus
   }
 
+  // --- Synergy helpers (generic) ---
+  const detectCasteSynergyKey = (sideBoard?: Slot[]): 'gangsters' | 'authorities' | 'loners' | null => {
+    const castes = (sideBoard || [])
+      .map(sl => (sl.card?.caste || '').toLowerCase().trim())
+      .filter(Boolean)
+    if (castes.length === 0) return null
+    const uniq = Array.from(new Set(castes))
+    if (uniq.length !== 1) return null
+    const c = uniq[0]
+    if (c.includes('gang')) return 'gangsters'
+    if (c.includes('author')) return 'authorities'
+    if (c.includes('loner') || c.includes('solo')) return 'loners'
+    return null
+  }
+  const synergyRForBoard = (sideBoard?: Slot[]): number => {
+    const k = detectCasteSynergyKey(sideBoard)
+    return (k === 'gangsters' || k === 'loners') ? 1 : 0
+  }
+  const synergyHpBonusForBoard = (sideBoard?: Slot[]): number => {
+    const k = detectCasteSynergyKey(sideBoard)
+    return (k === 'authorities' || k === 'loners') ? 1 : 0
+  }
+
   const ragePerCardYou = useMemo(() => calcRagePerCard(you?.board), [you?.board])
   const defendGlobalOpp = useMemo(() => calcGlobalDefend(opp?.board), [opp?.board])
+
+  // --- Synergy Systems (Your side) ---
+  const yourCasteSynergy = useMemo(() => {
+    const castes = (you?.board ?? [])
+      .map(sl => (sl.card?.caste || '').toLowerCase().trim())
+      .filter(Boolean)
+    if (castes.length === 0) return null as null | { name: string, effect: string }
+    const unique = Array.from(new Set(castes))
+    if (unique.length !== 1) return null
+    const c = unique[0]
+    if (c.includes('gang')) return { name: 'Gangsters', effect: '+1 R, +1 D' }
+    if (c.includes('author')) return { name: 'Authorities', effect: '+1 HP, +1 D' }
+    if (c.includes('loner') || c.includes('solo')) return { name: 'Loners', effect: '+1 R, +1 HP' }
+    return null
+  }, [you?.board])
+
+  const yourFactionSingle = useMemo(() => {
+    const factions = (you?.board ?? [])
+      .map(sl => (sl.card?.faction || '').trim())
+      .filter(Boolean)
+    if (factions.length === 0) return null as null | string
+    const unique = Array.from(new Set(factions))
+    return unique.length === 1 ? unique[0] : null
+  }, [you?.board])
+
+  // --- Synergy Systems (Opponent side) ---
+  const oppCasteSynergy = useMemo(() => {
+    const key = detectCasteSynergyKey(opp?.board)
+    if (!key) return null as null | { name: string, effect: string }
+    if (key === 'gangsters') return { name: 'Gangsters', effect: '+1 R, +1 D' }
+    if (key === 'authorities') return { name: 'Authorities', effect: '+1 HP, +1 D' }
+    if (key === 'loners') return { name: 'Loners', effect: '+1 R, +1 HP' }
+    return null
+  }, [opp?.board])
+  const oppFactionSingle = useMemo(() => {
+    const factions = (opp?.board ?? [])
+      .map(sl => (sl.card?.faction || '').trim())
+      .filter(Boolean)
+    if (factions.length === 0) return null as null | string
+    const unique = Array.from(new Set(factions))
+    return unique.length === 1 ? unique[0] : null
+  }, [opp?.board])
 
   // Shared bank (Golden fund): total 40 tokens across both players
   const TOTAL_MONEY_TOKENS = 40
@@ -620,8 +685,25 @@ export default function App(): JSX.Element {
                 />
               ))}
             </div>
-            <div className="tokens-row" id="opp_tokens_row">
-              <div className="money" id="opp_money">💰 {opp?.tokens?.reserve_money ?? 0}</div>
+            <div className="opp-info" id="opp_info">
+              <div className="opp-tokens" id="opp_tokens">
+                <div className="money" id="opp_money">💰 {opp?.tokens?.reserve_money ?? 0}</div>
+              </div>
+              {(oppCasteSynergy || oppFactionSingle) && (
+                <div className={`opp-synergy ${(() => { const k = detectCasteSynergyKey(opp?.board); return k ? 'caste-' + k : '' })()}`} id="opp_synergy">
+                  <div className="synergy-title">Synergy</div>
+                  <div className="synergy-row">
+                    <span className="synergy-label">Каста:</span>{' '}
+                    {oppCasteSynergy ? (<><b>{oppCasteSynergy.name}</b> → {oppCasteSynergy.effect}</>) : '—'}
+                  </div>
+                  {oppFactionSingle && (
+                    <div className="synergy-row">
+                      <span className="synergy-label">Фракция:</span>{' '}
+                      <b>{oppFactionSingle}</b> → каскады отключены в этой версии
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </section>
 
@@ -685,14 +767,30 @@ export default function App(): JSX.Element {
               </div>
             </div>
 
-            <div className="your-tokens" id="your_tokens">
-              <div className="money" id="your_money" title={`Your reserve: ${yourMoney}`}>
-                <button id="btn_money_minus" className="tkn-btn" onClick={() => removeMoney(1)} disabled={yourMoney <= 0}>−</button>
-                💰 <AnimatedNumber value={availableMoney} />
-                <button id="btn_money_plus" className="tkn-btn" onClick={() => addMoney(1)} disabled={bankMoney <= 0}>＋</button>
-                <MoneyThumbnails count={availableMoney} draggableTokens={true} owner="you" />
+            <div className="your-info" id="your_info">
+              <div className="your-tokens" id="your_tokens">
+                <div className="money" id="your_money" title={`Your reserve: ${yourMoney}`}>
+                  <button id="btn_money_minus" className="tkn-btn" onClick={() => removeMoney(1)} disabled={yourMoney <= 0}>−</button>
+                  💰 <AnimatedNumber value={availableMoney} />
+                  <button id="btn_money_plus" className="tkn-btn" onClick={() => addMoney(1)} disabled={bankMoney <= 0}>＋</button>
+                  <MoneyThumbnails count={availableMoney} draggableTokens={true} owner="you" />
+                </div>
               </div>
-              <div className="otboy" id="your_otboy">♻️ {you?.tokens?.otboy ?? 0}</div>
+              {(yourCasteSynergy || yourFactionSingle) && (
+                <div className={`your-synergy ${(() => { const k = detectCasteSynergyKey(you?.board); return k ? 'caste-' + k : '' })()}`} id="your_synergy">
+                  <div className="synergy-title">Synergy</div>
+                  <div className="synergy-row">
+                    <span className="synergy-label">Каста:</span>{' '}
+                    {yourCasteSynergy ? (<><b>{yourCasteSynergy.name}</b> → {yourCasteSynergy.effect}</>) : '—'}
+                  </div>
+                  {yourFactionSingle && (
+                    <div className="synergy-row">
+                      <span className="synergy-label">Фракция:</span>{' '}
+                      <b>{yourFactionSingle}</b> → каскады отключены в этой версии
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -853,7 +951,9 @@ export default function App(): JSX.Element {
                   // Total ATK
                   const atkCards = selectedAttackers.map(i => you?.board?.[i]?.card).filter(Boolean) as Card[]
                   const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
-                  const perCardBuff = ragePerCardYou
+                  const perCardBaseR = ragePerCardYou
+                  const perCardSynergyR = synergyRForBoard(you?.board)
+                  const perCardBuff = perCardBaseR + perCardSynergyR
                   const buffSum = (perCardBuff > 0 ? selectedAttackers.length * perCardBuff : 0)
                   const shieldsOnAttackers = selectedAttackers.reduce((s, i) => s + (you?.board?.[i]?.muscles ?? 0), 0)
                   const shieldsBonus = shieldsOnAttackers * 0.25
@@ -864,11 +964,12 @@ export default function App(): JSX.Element {
                   const defCard = defSlot?.card
                   const baseHP = defCard?.hp ?? 0
                   const shields = defSlot?.muscles ?? 0
-                  const totalHP = baseHP + shields
+                  const synergyDefHp = synergyHpBonusForBoard(opp?.board)
+                  const totalHP = baseHP + shields + synergyDefHp
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${selectedAttackers.length}×${perCardBuff}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${selectedAttackers.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${selectedAttackers.length}×${perCardSynergyR}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{synergyDefHp > 0 ? ' + 1' : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
@@ -966,7 +1067,9 @@ export default function App(): JSX.Element {
                     .map(i => attBoard?.[i]?.card)
                     .filter(Boolean) as Card[]
                   const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
-                  const perCardBuff = calcRagePerCard(attBoard)
+                  const perCardBaseR = calcRagePerCard(attBoard)
+                  const perCardSynergyR = synergyRForBoard(attBoard)
+                  const perCardBuff = perCardBaseR + perCardSynergyR
                   const buffSum = (perCardBuff > 0 ? attack.attackerSlots.length * perCardBuff : 0)
                   const shieldsOnAttackers = attack.attackerSlots.reduce((s, i) => s + (attBoard?.[i]?.muscles ?? 0), 0)
                   const shieldsBonus = shieldsOnAttackers * 0.25
@@ -978,12 +1081,13 @@ export default function App(): JSX.Element {
                   const defCard = defSlot?.card
                   const baseHP = defCard?.hp ?? 0
                   const shields = defSlot?.muscles ?? 0
-                  const totalHP = baseHP + shields
+                  const synergyDefHp = synergyHpBonusForBoard(defBoard)
+                  const totalHP = baseHP + shields + synergyDefHp
 
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBuff > 0 ? ` + ${attack.attackerSlots.length}×${perCardBuff}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${attack.attackerSlots.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${attack.attackerSlots.length}×${perCardSynergyR}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{synergyDefHp > 0 ? ' + 1' : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}

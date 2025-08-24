@@ -267,3 +267,38 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 }
 .preview-props { font-size: 1rem; line-height: 1.35; color: var(--text); }
 .preview-props .prop { margin-bottom: 6px; }
+
+/* Synergy blocks */
+.your-synergy, .opp-synergy {
+  margin-top: 8px;
+  background: var(--panel-2);
+  border: 1px solid #2a3240;
+  border-radius: 10px;
+  padding: 10px;
+}
+.your-synergy { box-shadow: 0 0 0 1px rgba(75, 192, 75, 0.12) inset; }
+.opp-synergy { box-shadow: 0 0 0 1px rgba(255, 99, 132, 0.12) inset; }
+.synergy-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 6px;
+}
+.synergy-row { font-size: 14px; margin: 4px 0; display: flex; align-items: baseline; gap: 6px; }
+.synergy-label { color: var(--muted); min-width: 64px; display: inline-flex; align-items: center; gap: 6px; }
+.synergy-label::before { content: '🧬'; filter: saturate(0.8); }
+
+/* Caste accents */
+.your-synergy.caste-gangsters, .opp-synergy.caste-gangsters { border-color: #334155; background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.06) 40%, transparent); }
+.your-synergy.caste-gangsters .synergy-title, .opp-synergy.caste-gangsters .synergy-title { color: #93c5fd; }
+.your-synergy.caste-gangsters .synergy-label::before, .opp-synergy.caste-gangsters .synergy-label::before { content: '🕶️'; }
+
+.your-synergy.caste-authorities, .opp-synergy.caste-authorities { border-color: #3b4c2f; background: linear-gradient(180deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.06) 40%, transparent); }
+.your-synergy.caste-authorities .synergy-title, .opp-synergy.caste-authorities .synergy-title { color: #9fe39f; }
+.your-synergy.caste-authorities .synergy-label::before, .opp-synergy.caste-authorities .synergy-label::before { content: '🏛️'; }
+
+.your-synergy.caste-loners, .opp-synergy.caste-loners { border-color: #6b2e2e; background: linear-gradient(180deg, rgba(255, 99, 132, 0.14), rgba(255, 99, 132, 0.06) 40%, transparent); }
+.your-synergy.caste-loners .synergy-title, .opp-synergy.caste-loners .synergy-title { color: #ff9aa8; }
+.your-synergy.caste-loners .synergy-label::before, .opp-synergy.caste-loners .synergy-label::before { content: '🧍'; }
