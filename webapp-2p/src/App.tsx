@@ -41,7 +41,7 @@ function getCasteIcon(caste?: string): string | null {
   return '🎴'
 }
 
-function CardView({ card, faceUp }: { card: Card | null, faceUp: boolean }) {
+function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0 }: { card: Card | null, faceUp: boolean, bonusHp?: number, bonusD?: number, bonusR?: number }) {
   if (!card) return (
     <div className="card empty">
       <div className="card-title">—</div>
@@ -52,6 +52,10 @@ function CardView({ card, faceUp }: { card: Card | null, faceUp: boolean }) {
       <div className="card-title">🎴 Face-down</div>
     </div>
   )
+  const hpDisp = (card.hp ?? 0) + (bonusHp || 0)
+  const atkDisp = (card.atk ?? 0)
+  const defDisp = (card.d ?? 0) + (bonusD || 0)
+  const rageDisp = (card.rage ?? 0) + (bonusR || 0)
   return (
     <div className="card">
       <div className="card-title">
@@ -60,13 +64,13 @@ function CardView({ card, faceUp }: { card: Card | null, faceUp: boolean }) {
       </div>
       <div className="card-illustration" aria-hidden="true">{getCardEmoji(card)}</div>
       <div className="card-row card-stats">
-        <span className="stat hp">HP: <b>{card.hp ?? 0}</b></span>
+        <span className="stat hp">HP: <b>{hpDisp}</b></span>
         {' '}•{' '}
-        <span className="stat atk">ATK: <b>{card.atk ?? 0}</b></span>
+        <span className="stat atk">ATK: <b>{atkDisp}</b></span>
         {' '}•{' '}
-        <span className="stat def">D: <b>{card.d ?? 0}</b></span>
-        {(card.rage ?? 0) > 0 && (
-          <>{' '}•{' '}<span className="stat rage">R: <b>{card.rage}</b></span></>
+        <span className="stat def">D: <b>{defDisp}</b></span>
+        {rageDisp > 0 && (
+          <>{' '}•{' '}<span className="stat rage">R: <b>{rageDisp}</b></span></>
         )}
       </div>
       {((card.price ?? 0) > 0 || (card.corruption ?? 0) > 0) && (
@@ -139,8 +143,8 @@ function AnimatedNumber({ value, className }: { value: number, className?: strin
   return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
 }
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard, onHoverStart, onHoverEnd, onDragAnyStart, onDragAnyEnd, onSlotDragStart }:
-  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void, onHoverStart?: () => void, onHoverEnd?: () => void, onDragAnyStart?: () => void, onDragAnyEnd?: () => void, onSlotDragStart?: (index: number) => void }): JSX.Element {
+function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard, onHoverStart, onHoverEnd, onDragAnyStart, onDragAnyEnd, onSlotDragStart, bonusHp = 0, bonusD = 0, bonusR = 0 }:
+  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void, onHoverStart?: () => void, onHoverEnd?: () => void, onDragAnyStart?: () => void, onDragAnyEnd?: () => void, onSlotDragStart?: (index: number) => void, bonusHp?: number, bonusD?: number, bonusR?: number }): JSX.Element {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
@@ -214,7 +218,7 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
       </div>
       <div className="slot-inner">
         <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDragEnd={onDragAnyEnd} onDoubleClick={onFlip} onClick={onClickCard} onMouseEnter={onHoverStart} onMouseLeave={onHoverEnd}>
-          <CardView card={slot.card} faceUp={slot.face_up} />
+          <CardView card={slot.card} faceUp={slot.face_up} bonusHp={bonusHp} bonusD={bonusD} bonusR={bonusR} />
         </div>
       </div>
     </div>
@@ -240,14 +244,14 @@ export default function App(): JSX.Element {
   } | null>(null)
 
   // Hover preview side modal state
-  const [preview, setPreview] = useState<{ card: Card, faceUp: boolean } | null>(null)
+  const [preview, setPreview] = useState<{ card: Card, faceUp: boolean, owner?: 'you' | 'opponent' } | null>(null)
   const previewTimerRef = useRef<number | null>(null)
   const previewSuppressedRef = useRef<boolean>(false)
 
   // Dragging card origin to highlight valid drop zones
   const [dragCardFrom, setDragCardFrom] = useState<DragPayload | null>(null)
 
-  const handlePreviewHoverStart = (card: Card | null, faceUp: boolean) => {
+  const handlePreviewHoverStart = (card: Card | null, faceUp: boolean, owner?: 'you' | 'opponent') => {
     if (!card) return
     if (previewSuppressedRef.current) return
     if (previewTimerRef.current) {
@@ -255,7 +259,7 @@ export default function App(): JSX.Element {
       previewTimerRef.current = null
     }
     previewTimerRef.current = window.setTimeout(() => {
-      setPreview({ card, faceUp })
+      setPreview({ card, faceUp, owner })
     }, 1500)
   }
 
@@ -378,6 +382,10 @@ export default function App(): JSX.Element {
   const synergyHpBonusForBoard = (sideBoard?: Slot[]): number => {
     const k = detectCasteSynergyKey(sideBoard)
     return (k === 'authorities' || k === 'loners') ? 1 : 0
+  }
+  const synergyDBonusForBoard = (sideBoard?: Slot[]): number => {
+    const k = detectCasteSynergyKey(sideBoard)
+    return (k === 'gangsters' || k === 'authorities') ? 1 : 0
   }
 
   const ragePerCardYou = useMemo(() => calcRagePerCard(you?.board), [you?.board])
@@ -679,9 +687,12 @@ export default function App(): JSX.Element {
                   owner="opponent"
                   extraClassName={selectedAttackers.length > 0 && s.card ? 'targetable' : ''}
                   onClickCard={() => handleTargetClick(i)}
-                  onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up)}
+                  onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up, 'opponent')}
                   onHoverEnd={handlePreviewHoverEnd}
                   onDragAnyStart={handlePreviewHoverEnd}
+                  bonusHp={synergyHpBonusForBoard(opp?.board)}
+                  bonusD={synergyDBonusForBoard(opp?.board)}
+                  bonusR={synergyRForBoard(opp?.board)}
                 />
               ))}
             </div>
@@ -739,11 +750,14 @@ export default function App(): JSX.Element {
                     if ((s?.muscles ?? 0) > 0) { removeShieldToReserve(i) }
                   }}
                   onReceiveShieldFrom={(srcIndex: number) => { if (srcIndex !== i) { removeShieldOnly(srcIndex); addShieldOnly(i) } }}
-                  onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up)}
+                  onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up, 'you')}
                   onHoverEnd={handlePreviewHoverEnd}
                   onDragAnyStart={handlePreviewHoverEnd}
                   onSlotDragStart={(idx: number) => { handlePreviewHoverEnd(); setDragCardFrom({ from: 'slot', fromIndex: idx }) }}
                   onDragAnyEnd={() => setDragCardFrom(null)}
+                  bonusHp={synergyHpBonusForBoard(you?.board)}
+                  bonusD={synergyDBonusForBoard(you?.board)}
+                  bonusR={synergyRForBoard(you?.board)}
                 />
               ))}
             </div>
@@ -758,7 +772,7 @@ export default function App(): JSX.Element {
                     draggable 
                     onDragStart={(e: React.DragEvent<HTMLDivElement>) => onHandDragStart(i, e)}
                     onDragEnd={() => setDragCardFrom(null)}
-                    onMouseEnter={() => handlePreviewHoverStart(c, true)}
+                    onMouseEnter={() => handlePreviewHoverStart(c, true, 'you')}
                     onMouseLeave={handlePreviewHoverEnd}
                   >
                     <CardView card={c} faceUp={true} />
@@ -875,17 +889,34 @@ export default function App(): JSX.Element {
           <div className="side-modal-content">
             <div className="modal-card">
               <div className="card-wrap">
-                <CardView card={preview.card} faceUp={preview.faceUp} />
+                <CardView 
+                  card={preview.card} 
+                  faceUp={preview.faceUp}
+                  bonusHp={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyHpBonusForBoard(b) })()}
+                  bonusD={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyDBonusForBoard(b) })()}
+                  bonusR={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyRForBoard(b) })()}
+                />
               </div>
             </div>
             <div className="preview-props">
               <div className="prop"><b>Тип:</b> {preview.card.type || '—'}</div>
               <div className="prop"><b>Фракция:</b> {preview.card.faction || '—'}</div>
               <div className="prop"><b>Каста:</b> {preview.card.caste || '—'}</div>
-              <div className="prop"><b>HP:</b> {preview.card.hp ?? 0}</div>
-              <div className="prop"><b>ATK:</b> {preview.card.atk ?? 0}</div>
-              <div className="prop"><b>D:</b> {preview.card.d ?? 0}</div>
-              {(preview.card.rage ?? 0) > 0 && <div className="prop"><b>Rage:</b> {preview.card.rage}</div>}
+              {(() => {
+                const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined
+                const hp = (preview.card.hp ?? 0) + synergyHpBonusForBoard(b)
+                const atk = (preview.card.atk ?? 0)
+                const def = (preview.card.d ?? 0) + synergyDBonusForBoard(b)
+                const r = (preview.card.rage ?? 0) + synergyRForBoard(b)
+                return (
+                  <>
+                    <div className="prop"><b>HP:</b> {hp}</div>
+                    <div className="prop"><b>ATK:</b> {atk}</div>
+                    <div className="prop"><b>D:</b> {def}</div>
+                    {r > 0 && <div className="prop"><b>Rage:</b> {r}</div>}
+                  </>
+                )
+              })()}
               {(preview.card.price ?? 0) > 0 && <div className="prop"><b>Price:</b> {preview.card.price}</div>}
               {(preview.card.corruption ?? 0) > 0 && <div className="prop"><b>Corruption:</b> {preview.card.corruption}</div>}
               {preview.card.notes && <div className="prop"><b>Примечания:</b> {preview.card.notes}</div>}
@@ -908,7 +939,10 @@ export default function App(): JSX.Element {
                 <div className="card-wrap" style={{ opacity: localAttackModal.cardMarkedForDestroy ? 0.5 : 1 }}>
                   <CardView 
                     card={opp?.board?.[localAttackModal.targetSlot]?.card ?? null} 
-                    faceUp={opp?.board?.[localAttackModal.targetSlot]?.face_up ?? false} 
+                    faceUp={opp?.board?.[localAttackModal.targetSlot]?.face_up ?? false}
+                    bonusHp={synergyHpBonusForBoard(opp?.board)}
+                    bonusD={synergyDBonusForBoard(opp?.board)}
+                    bonusR={synergyRForBoard(opp?.board)} 
                   />
                 </div>
                 {/* Interactive shields */}
@@ -1025,9 +1059,21 @@ export default function App(): JSX.Element {
               <div className="modal-card">
                 <div className="card-wrap" style={{ opacity: attack.plan.destroyCard ? 0.5 : 1 }}>
                   {attack.target.pid === you?.id ? (
-                    <CardView card={you?.board?.[attack.target.slot]?.card ?? null} faceUp={you?.board?.[attack.target.slot]?.face_up ?? false} />
+                    <CardView 
+                      card={you?.board?.[attack.target.slot]?.card ?? null} 
+                      faceUp={you?.board?.[attack.target.slot]?.face_up ?? false}
+                      bonusHp={synergyHpBonusForBoard(you?.board)}
+                      bonusD={synergyDBonusForBoard(you?.board)}
+                      bonusR={synergyRForBoard(you?.board)}
+                    />
                   ) : (
-                    <CardView card={opp?.board?.[attack.target.slot]?.card ?? null} faceUp={opp?.board?.[attack.target.slot]?.face_up ?? false} />
+                    <CardView 
+                      card={opp?.board?.[attack.target.slot]?.card ?? null} 
+                      faceUp={opp?.board?.[attack.target.slot]?.face_up ?? false}
+                      bonusHp={synergyHpBonusForBoard(opp?.board)}
+                      bonusD={synergyDBonusForBoard(opp?.board)}
+                      bonusR={synergyRForBoard(opp?.board)}
+                    />
                   )}
                 </div>
                 {/* Shields with marked removals */}

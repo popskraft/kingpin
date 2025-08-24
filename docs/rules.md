@@ -139,9 +139,9 @@ Turn passes to next player clockwise
 ## 4. Synergy Systems
 
 ### 4.1 Caste Synergies (When only cards of one common caste are on board)
-- **Gangsters**: +1 R, +1 D. Enhanced aggression.
-- **Authorities**: +1 HP, +1 D. Enhanced defense and health.
-- **Loners**: +1 R, +1 HP. Balanced parameters, unique abilities
+- **Gangsters**: +1 R Enhanced aggression.
+- **Authorities**: +1 HP Enhanced health.
+- **Loners**: +1 D Enhanced defense.
 
 ### 4.2 Faction Synergies
 - **Heads**: Leadership abilities
