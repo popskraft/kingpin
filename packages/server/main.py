@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from engine.loader import load_game, load_yaml_config, build_state_from_config
+from engine.loader import load_game, load_yaml_config, build_state_from_config, load_cards_from_csv
 from engine.models import GameState, PlayerState, Slot, Card
 from engine.engine import initialize_game
 
@@ -126,17 +126,10 @@ def _ensure_slots(state: GameState, count: int = MAX_SLOTS) -> None:
 
 
 def _build_state_from_csv() -> Tuple[GameState, dict]:
-    """Load game state with cards from CSV file."""
-    # Load game configuration from YAML (without cards)
-    cfg = load_yaml_config(ROOT / "config" / "default.yaml")
-    
-    # Load cards from CSV
+    """Load game state with cards from CSV file using unified loader."""
+    # Use unified loader from engine
     csv_path = ROOT / "config" / "cards.csv"
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Card data file not found: {csv_path}")
-    
-    # Load game state with cards from CSV
-    st, _ = load_game(
+    st, cfg = load_game(
         str(ROOT / "config" / "default.yaml"),
         csv_path=csv_path
     )
@@ -156,31 +149,7 @@ def _build_state_from_csv() -> Tuple[GameState, dict]:
     return st, cfg
 
 
-def _parse_abl_text(abl_text: str) -> dict | int:
-    text = (abl_text or "").strip()
-    if not text:
-        return 0
-    parts = [p.strip() for p in text.replace(',', ';').split(';') if p.strip()]
-    kv: dict = {}
-    on_enter: dict = {}
-    for p in parts:
-        if ':' in p:
-            k, v = p.split(':', 1)
-            k = k.strip().lower()
-            v = v.strip()
-            try:
-                num = int(float(v)) if v not in ("all", "n/a") else v
-            except Exception:
-                num = v
-            if k in {"steal", "gain", "bribe"} and isinstance(num, int):
-                on_enter[k] = num
-            else:
-                kv[k] = num
-        else:
-            kv[p] = 1
-    if on_enter:
-        kv["on_enter"] = on_enter
-    return kv or 0
+# Removed: now using unified ABL parsing from engine.loader
 
 
 def _load_caste_map() -> Dict[str, str]:
@@ -201,48 +170,15 @@ def _load_caste_map() -> Dict[str, str]:
 
 
 def _load_cards_index() -> Dict[str, dict]:
-    """Загрузить все карты из CSV в индекс по ID без фильтрации по InDeck/В_колоде.
-    Возвращает dict[card_id] -> card_data (совместимую с engine.models.Card).
-    """
+    """Load all cards from CSV using unified loader."""
     csv_path = ROOT / "config" / "cards.csv"
-    index: Dict[str, dict] = {}
-    if not csv_path.exists():
-        return index
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for i, row in enumerate(reader):
-            cid = (row.get("ID") or row.get("Id") or f"card_{i}").strip()
-            if not cid:
-                continue
-            name = (row.get("Name") or row.get("Название") or f"Card {i}").strip()
-            ctype = (row.get("Type") or row.get("Тип") or "common").strip().lower()
-            faction = (row.get("Faction") or row.get("Фракция") or "neutral").strip().lower()
-            caste = (row.get("Caste") or row.get("Каста") or "").strip() or None
-            def _to_int(v, default=0):
-                try:
-                    return int(float(v))
-                except Exception:
-                    return default
-            hp = _to_int(row.get("HP", 1), 1) if row.get("HP") else 1
-            atk = _to_int(row.get("ATK", 0), 0) if row.get("ATK") else 0
-            defend = _to_int(row.get("Defend", 0), 0) if row.get("Defend") else 0
-            notes = (row.get("Description") or row.get("Описание") or "").strip()
-            abl_text = (row.get("ABL") or "").strip()
-            data = {
-                "id": cid,
-                "name": name,
-                "type": ctype,
-                "faction": faction,
-                "caste": caste,
-                "hp": hp,
-                "atk": atk,
-                "d": defend,
-                "notes": notes,
-            }
-            if abl_text:
-                data["abl"] = _parse_abl_text(abl_text)
-            index[cid] = data
-    return index
+    try:
+        # Use unified card loader, load ALL cards (not just in-deck)
+        cards = load_cards_from_csv(csv_path, include_all=True)
+        # Convert to index format
+        return {card.id: card.model_dump() for card in cards}
+    except Exception:
+        return {}
 
 
 def _serialize_slot_for_view(s: Slot, for_owner: bool) -> dict:
@@ -366,12 +302,12 @@ async def join_room(sid, data):
             "source": "csv",
             "log": [],
         }
-        # Debug: log and print deck/shelf sizes after CSV load
+        # Debug: log and print Reserve/Draw sizes after CSV load
         try:
-            print(f"[ROOM {room}] CSV loaded: shelf={len(state.shelf)}, deck={len(state.deck)}")
+            print(f"[ROOM {room}] CSV loaded: Reserve pile={len(state.shelf)}, Draw pile={len(state.deck)}")
         except Exception:
             pass
-        _log(room, "load", f"CSV loaded: shelf={len(state.shelf)}, deck={len(state.deck)}")
+        _log(room, "load", f"CSV loaded: Reserve pile={len(state.shelf)}, Draw pile={len(state.deck)}")
         _log(room, "room", f"Room created (source=CSV)")
         _log(room, "turn_start", f"Game started. Active: {state.active_player} · Turn {state.turn_number}")
 
@@ -848,7 +784,7 @@ async def move_card(sid, data):
             except Exception:
                 return
             st.discard_out_of_game.append(card)
-            _log(room, "discard", f"{pid} discarded {card.name}", actor=pid)
+            _log(room, "discard", f"{pid} discarded {card.name} to Discard pile", actor=pid)
         elif from_zone == "slot":
             si = int(from_index)
             if si < 0 or si >= len(p.slots):
@@ -860,7 +796,7 @@ async def move_card(sid, data):
             st.discard_out_of_game.append(card)
             slot.card = None
             slot.muscles = 0
-            _log(room, "discard", f"{pid} discarded {card.name} from slot {si+1}", actor=pid)
+            _log(room, "discard", f"{pid} discarded {card.name} from slot {si+1} to Discard pile", actor=pid)
     elif to_zone == "shelf":
         # Полка (временное откладывание карт, могут вернуться в игру)
         if from_zone == "hand":
@@ -869,7 +805,7 @@ async def move_card(sid, data):
             except Exception:
                 return
             st.shelf.append(card)
-            _log(room, "shelve", f"{pid} placed {card.name} on shelf", actor=pid)
+            _log(room, "shelve", f"{pid} placed {card.name} on Reserve pile", actor=pid)
         elif from_zone == "slot":
             si = int(from_index)
             if si < 0 or si >= len(p.slots):
@@ -881,7 +817,7 @@ async def move_card(sid, data):
             st.shelf.append(card)
             slot.card = None
             slot.muscles = 0
-            _log(room, "shelve", f"{pid} moved {card.name} from slot {si+1} to shelf", actor=pid)
+            _log(room, "shelve", f"{pid} moved {card.name} from slot {si+1} to Reserve pile", actor=pid)
     elif from_zone == "shelf" and to_zone == "hand":
         # Взять карту с полки в руку
         if pid != st.active_player:
@@ -895,7 +831,7 @@ async def move_card(sid, data):
             return
         card = st.shelf.pop(idx)
         p.hand.append(card)
-        _log(room, "unshelve", f"{pid} took {card.name} from shelf to hand", actor=pid)
+        _log(room, "unshelve", f"{pid} took {card.name} from Reserve pile to hand", actor=pid)
     elif from_zone == "shelf" and to_zone == "slot":
         # Положить карту с полки на пустой слот
         if pid != st.active_player:

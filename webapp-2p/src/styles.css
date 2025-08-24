@@ -98,6 +98,10 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 .card-stats .stat.hp { background: rgba(75, 192, 75, 0.12); color: #9fe39f; }
 .card-stats .stat.atk { background: rgba(255, 99, 132, 0.12); color: #ff9aa8; }
 .card-stats .stat.def { background: rgba(75, 192, 192, 0.12); color: #9fe3e3; }
+.card-stats .stat.rage { background: rgba(255, 165, 0, 0.12); color: #ffcc9a; }
+.card-economy { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.card-economy .stat.price { background: rgba(255, 215, 0, 0.12); color: #ffe39f; }
+.card-economy .stat.corruption { background: rgba(138, 43, 226, 0.12); color: #d9a9ff; }
 .card-notes { font-size: 12px; color: #b8c2cf; margin-top: auto; }
 
 /* Animated numbers for wallet/bank */

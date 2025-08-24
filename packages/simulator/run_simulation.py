@@ -6,6 +6,11 @@
 import os
 import sys
 import argparse
+from pathlib import Path
+
+# Add parent directory to path for engine imports
+sys.path.append(str(Path(__file__).parent.parent))
+from engine.config import get_path
 from game_simulator import GameSimulator
 
 def main():
@@ -23,8 +28,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Путь к файлу с картами
-    cards_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'cards.csv')
+    # Путь к файлу с картами через unified config
+    cards_file = get_path('cards_csv')
     
     if not os.path.exists(cards_file):
         print(f"Ошибка: файл {cards_file} не найден")

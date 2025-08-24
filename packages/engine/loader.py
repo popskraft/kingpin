@@ -4,6 +4,7 @@ from typing import Tuple, List, Dict, Any
 import yaml
 import csv
 from .models import GameState, GameConfig, Card, PlayerState, Slot
+from .config import get_csv_columns, get_path
 
 
 def load_yaml_config(path: str | Path) -> dict:
@@ -16,15 +17,37 @@ def load_yaml_config(path: str | Path) -> dict:
     return cfg
 
 
-def load_cards_from_csv(csv_path: str | Path) -> List[Card]:
-    """Load card data exclusively from CSV file."""
+def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List[Card]:
+    """Load card data exclusively from CSV file.
+    
+    Args:
+        csv_path: Path to CSV file
+        include_all: If True, include all cards regardless of InDeck status
+    """
     cards = []
     with open(csv_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            # Helper: robust int parsing (accept floats like '0.25' and tokens like 'n/a')
+            def _to_int(v, default=0):
+                try:
+                    s = str(v).strip()
+                    if not s or s.lower() in {"n/a", "na"}:
+                        return default
+                    return int(float(s))
+                except Exception:
+                    return default
+
+            # Helper function to get first available column value
+            def _get_column_value(field: str, default: Any = None) -> Any:
+                for col in get_csv_columns(field):
+                    if col in row and row[col]:
+                        return row[col]
+                return default
+            
             # Determine if the card should be in the deck
-            # Support both English 'InDeck' and Russian 'В_колоде' columns and ✓/✗ markers
-            indeck_raw = (row.get('InDeck') or row.get('В_колоде') or row.get('In Deck') or '').strip()
+            # Support multiple column names and ✓/✗ markers
+            indeck_raw = (_get_column_value('in_deck') or '').strip()
             indeck_l = indeck_raw.lower()
             if indeck_raw in {'✓', '✔', '+'} or indeck_l in {'yes', 'true', '1', 'y', 'да'}:
                 in_deck = True
@@ -33,24 +56,27 @@ def load_cards_from_csv(csv_path: str | Path) -> List[Card]:
             else:
                 # Default to including the card if unclear
                 in_deck = True
-            if not in_deck:
+            if not in_deck and not include_all:
                 continue
-                
-            # Map CSV columns to card attributes
+            
+            # Map CSV columns to card attributes using unified column mappings
             card_data = {
-                'id': row.get('ID') or row.get('Id') or f"card_{len(cards)}",
-                'name': row.get('Name') or row.get('Название') or f"Card {len(cards)}",
-                'type': (row.get('Type') or row.get('Тип') or 'common').lower(),
-                'faction': (row.get('Faction') or row.get('Фракция') or 'neutral').lower(),
-                'caste': (row.get('Caste') or row.get('Каста') or '').strip() or None,
-                'hp': int(row.get('HP', 1)) if row.get('HP') else 1,
-                'atk': int(row.get('ATK', 0)) if row.get('ATK') else 0,
-                'd': int(row.get('Defend', 0)) if row.get('Defend') else 0,
-                'notes': (row.get('Description') or row.get('Описание') or '').strip()
+                'id': _get_column_value('id') or f"card_{len(cards)}",
+                'name': _get_column_value('name') or f"Card {len(cards)}",
+                'type': (_get_column_value('type') or 'common').lower(),
+                'faction': (_get_column_value('faction') or 'neutral').lower(),
+                'caste': (_get_column_value('caste') or '').strip() or None,
+                'hp': _to_int(_get_column_value('hp', 1), 1),
+                'atk': _to_int(_get_column_value('atk', 0), 0),
+                'd': _to_int(_get_column_value('defend', 0), 0),
+                'price': _to_int(_get_column_value('price', 0), 0),
+                'corruption': _to_int(_get_column_value('corruption', 0), 0),
+                'rage': _to_int(_get_column_value('rage', 0), 0),
+                'notes': (_get_column_value('notes') or '').strip()
             }
             
             # Parse ABL if present
-            abl_text = (row.get('ABL') or '').strip()
+            abl_text = (_get_column_value('abl') or '').strip()
             if abl_text:
                 card_data['abl'] = _parse_abl_text(abl_text)
                 

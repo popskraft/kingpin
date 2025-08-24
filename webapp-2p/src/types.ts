@@ -7,6 +7,9 @@ export type Card = {
   hp?: number
   atk?: number
   d?: number
+  price?: number
+  corruption?: number
+  rage?: number
   notes?: string
 }
 

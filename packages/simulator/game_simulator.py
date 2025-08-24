@@ -3,7 +3,6 @@ Kingpin Game Simulator
 Симулятор множественных игровых тестов для анализа баланса
 """
 
-import csv
 import random
 import math
 from typing import Dict, List, Tuple, Optional, Any
@@ -11,6 +10,13 @@ from dataclasses import dataclass, field as dataclass_field
 from collections import defaultdict
 from enum import Enum
 import copy
+import sys
+from pathlib import Path
+
+# Add parent directory to path for engine imports
+sys.path.append(str(Path(__file__).parent.parent))
+from engine.loader import load_cards_from_csv
+from engine.models import Card as EngineCard
 
 class GamePhase(Enum):
     SETUP = "setup"
@@ -26,56 +32,85 @@ class ActionType(Enum):
 
 @dataclass
 class GameCard:
-    id: str
-    name: str
-    caste: str
-    faction: str
-    hp: int
-    max_hp: int
-    atk: int
-    base_atk: int
-    price: int
-    corruption: int
-    defend: int
-    rage: int
-    abilities: List[str]
-    independence: int
+    """Simulator-specific wrapper around engine Card model."""
+    engine_card: EngineCard
     in_play: bool = False
     shields: int = 0
     used_abilities: List[str] = dataclass_field(default_factory=list)
     turn_played: int = 0
     kills: int = 0
+    current_hp: Optional[int] = None
+    current_atk: Optional[int] = None
+    
+    def __post_init__(self):
+        # Initialize current stats from engine card
+        if self.current_hp is None:
+            self.current_hp = self.engine_card.hp
+        if self.current_atk is None:
+            self.current_atk = self.engine_card.atk
+    
+    # Property accessors for compatibility
+    @property
+    def id(self) -> str:
+        return self.engine_card.id
+    
+    @property
+    def name(self) -> str:
+        return self.engine_card.name
+    
+    @property
+    def caste(self) -> str:
+        return self.engine_card.caste or ''
+    
+    @property
+    def faction(self) -> str:
+        return str(self.engine_card.faction)
+    
+    @property
+    def hp(self) -> int:
+        return self.current_hp or 0
+    
+    @property
+    def max_hp(self) -> int:
+        return self.engine_card.hp
+    
+    @property
+    def atk(self) -> int:
+        return self.current_atk or 0
+    
+    @property
+    def base_atk(self) -> int:
+        return self.engine_card.atk
+    
+    @property
+    def price(self) -> int:
+        return self.engine_card.price
+    
+    @property
+    def corruption(self) -> int:
+        return self.engine_card.corruption
+    
+    @property
+    def defend(self) -> int:
+        return self.engine_card.d
+    
+    @property
+    def rage(self) -> int:
+        return self.engine_card.rage
+    
+    @property
+    def abilities(self) -> List[str]:
+        # Convert ABL to string list for compatibility
+        abl = self.engine_card.abl
+        if isinstance(abl, dict):
+            return [f"{k}:{v}" for k, v in abl.items()]
+        elif isinstance(abl, int) and abl > 0:
+            return [str(abl)]
+        return []
     
     @classmethod
-    def from_csv_row(cls, row: Dict[str, str]) -> 'GameCard':
-        hp = int(float(row['HP']) if row['HP'] and row['HP'] != 'n/a' else 0)
-        atk = int(float(row['ATK']) if row['ATK'] and row['ATK'] != 'n/a' else 0)
-        price = int(float(row['Price']) if row['Price'] and row['Price'] != 'n/a' else 0)
-        corruption = int(float(row['Corruption']) if row['Corruption'] and row['Corruption'] != 'n/a' else 0)
-        defend = int(float(row['Defend']) if row['Defend'] and row['Defend'] != 'n/a' else 0)
-        rage = int(float(row['Rage']) if row['Rage'] and row['Rage'] != 'n/a' else 0)
-        independence = int(float(row['Independence']) if row['Independence'] and row['Independence'] != 'n/a' else 0)
-        
-        abilities = []
-        if row['ABL'] and row['ABL'] != '0':
-            abilities = [row['ABL']]
-            
-        return cls(
-            id=row['ID'],
-            name=row['Название'],
-            caste=row['Каста'],
-            faction=row['Фракция'],
-            hp=hp,
-            max_hp=hp,
-            atk=atk,
-            base_atk=atk,
-            price=price,
-            corruption=corruption,
-            defend=defend,
-            rage=rage,
-            abilities=abilities,
-            independence=independence
-        )
+    def from_engine_card(cls, engine_card: EngineCard) -> 'GameCard':
+        return cls(engine_card=engine_card)
 
 @dataclass
 class Player:
@@ -137,21 +172,35 @@ class GameState:
 
 class GameSimulator:
     def __init__(self, cards_file: str):
-        self.cards_data = self._load_cards(cards_file)
+        self.cards_data = self.load_cards_from_csv(cards_file)
         self.castes = ['gangsters', 'authorities', 'loners', 'solo']
         
-    def _load_cards(self, filename: str) -> List[GameCard]:
-        cards = []
-        with open(filename, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row['В_колоде'] == '✓' and row['Тип'] not in ['boss', 'event', 'token']:
-                    cards.append(GameCard.from_csv_row(row))
-        return cards
-    
+    def load_cards_from_csv(self, csv_file: str) -> Dict[str, List[GameCard]]:
+        """Load cards from CSV using unified engine loader and organize by caste"""
+        cards_by_caste = {
+            'gangsters': [],
+            'authorities': [],
+            'loners': [],
+            'solo': []
+        }
+        
+        # Use unified card loader from engine
+        engine_cards = load_cards_from_csv(csv_file, include_all=False)
+        
+        for engine_card in engine_cards:
+            game_card = GameCard.from_engine_card(engine_card)
+            caste = game_card.caste.lower()
+            if caste in cards_by_caste:
+                cards_by_caste[caste].append(game_card)
+            elif caste == '':
+                # Handle cards without caste as solo
+                cards_by_caste['solo'].append(game_card)
+        
+        return cards_by_caste
+
     def create_deck(self, caste: str, deck_size: int = 8) -> List[GameCard]:
         """Создает колоду для указанной касты"""
-        caste_cards = [card for card in self.cards_data if card.caste == caste]
+        caste_cards = [card for card in self.cards_data[caste] if card.caste == caste]
         
         # Берем все доступные карты касты или случайную выборку
         if len(caste_cards) <= deck_size:

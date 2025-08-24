@@ -10,6 +10,7 @@ class CardType(str, Enum):
     common = "common"
     event = "event"
     action = "action"  # мгновенные действия/события
+    token = "token"  # двусторонние жетоны
 
 
 class Faction(str, Enum):
@@ -33,6 +34,9 @@ class Card(BaseModel):
     hp: int = 1
     atk: int = 0
     d: int = 0  # темп найма Братков
+    price: int = 0  # цена карты
+    corruption: int = 0  # коррупция
+    rage: int = 0  # ярость
     # Способность: числовое значение или словарь трейтов (в т.ч. вложенные). Допускаем строковые значения
     # для спец-маркеров вроде "all": {"anti_corruption": "all"}
     abl: int | Dict[str, int | str | dict] = 0

@@ -65,7 +65,17 @@ function CardView({ card, faceUp }: { card: Card | null, faceUp: boolean }) {
         <span className="stat atk">ATK: <b>{card.atk ?? 0}</b></span>
         {' '}•{' '}
         <span className="stat def">D: <b>{card.d ?? 0}</b></span>
+        {(card.rage ?? 0) > 0 && (
+          <>{' '}•{' '}<span className="stat rage">R: <b>{card.rage}</b></span></>
+        )}
       </div>
+      {((card.price ?? 0) > 0 || (card.corruption ?? 0) > 0) && (
+        <div className="card-row card-economy">
+          {(card.price ?? 0) > 0 && <span className="stat price">$: <b>{card.price}</b></span>}
+          {(card.price ?? 0) > 0 && (card.corruption ?? 0) > 0 && ' • '}
+          {(card.corruption ?? 0) > 0 && <span className="stat corruption">CRP: <b>{card.corruption}</b></span>}
+        </div>
+      )}
       {card.faction ? (
         <div className="card-row card-faction">Faction: <b>{card.faction}</b></div>
       ) : null}
@@ -310,8 +320,8 @@ export default function App(): JSX.Element {
   const ragePerCardYou = useMemo(() => calcRagePerCard(you?.board), [you?.board])
   const defendGlobalOpp = useMemo(() => calcGlobalDefend(opp?.board), [opp?.board])
 
-  // Shared bank: total 36 tokens across both players
-  const TOTAL_MONEY_TOKENS = 36
+  // Shared bank (Golden fund): total 40 tokens across both players
+  const TOTAL_MONEY_TOKENS = 40
   const yourMoney = you?.tokens?.reserve_money ?? 0
   const oppMoney = opp?.tokens?.reserve_money ?? 0
   // Shields on boards
@@ -597,7 +607,7 @@ export default function App(): JSX.Element {
             <div className="pile-count" id="pile_draw_count">{view?.shared?.deckCount ?? 0}</div>
             <button id="btn_draw_sidebar" onClick={handleDraw}>Draw</button>
           </div>
-          <div className="pile-box pile-reserve" id="pile_safe_bank" title={`Bank: ${bankMoney} (total ${TOTAL_MONEY_TOKENS} − reserves ${yourMoney + oppMoney} − shields ${totalYourShields + totalOppShields})`} onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={(e: React.DragEvent) => {
+          <div className="pile-box pile-reserve" id="pile_safe_bank" title={`Bank (Golden fund): ${bankMoney} (total ${TOTAL_MONEY_TOKENS} − reserves ${yourMoney + oppMoney} − shields ${totalYourShields + totalOppShields})`} onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={(e: React.DragEvent) => {
             const data = e.dataTransfer.getData('application/x-token')
             if (!data) return
             try {
@@ -612,13 +622,13 @@ export default function App(): JSX.Element {
               }
             } catch {}
           }}>
-            <div className="pile-title" id="pile_safe_bank_title">Safe (bank)</div>
+            <div className="pile-title" id="pile_safe_bank_title">Bank</div>
             <div className="pile-count" id="pile_safe_bank_count">💰 <AnimatedNumber value={bankMoney} /></div>
             {/* Do not allow dragging tokens from bank to avoid reserve/bank changes during internal distribution */}
             <MoneyThumbnails count={bankMoney} draggableTokens={false} owner="bank" />
           </div>
           <div className="pile-box pile-reserve" id="pile_reserve" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onShelfDrop}>
-            <div className="pile-title" id="pile_reserve_title">Reserve</div>
+            <div className="pile-title" id="pile_reserve_title">Reserve pile</div>
             <div className="pile-count" id="pile_reserve_count">{view?.shared?.shelfCount ?? 0}</div>
             <div className="shelf-list">
               {view?.shared?.shelf?.map((c, i) => (
@@ -626,12 +636,31 @@ export default function App(): JSX.Element {
                   <div className="shelf-card-name">{c.name}</div>
                   {c.caste && <div className="shelf-card-caste">{c.caste}</div>}
                   {c.faction && <div className="shelf-card-faction">{c.faction}</div>}
+                  {(c.rage ?? 0) > 0 && (
+                    <div className="card-row card-stats shelf-stats">
+                      <span className="stat rage">R: <b>{c.rage}</b></span>
+                    </div>
+                  )}
+                  {((c.price ?? 0) > 0 || (c.corruption ?? 0) > 0) && (
+                    <div className="card-row card-economy shelf-economy">
+                      {(c.price ?? 0) > 0 && <span className="stat price">$: <b>{c.price}</b></span>}
+                      {(c.price ?? 0) > 0 && (c.corruption ?? 0) > 0 && ' • '}
+                      {(c.corruption ?? 0) > 0 && <span className="stat corruption">CRP: <b>{c.corruption}</b></span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
+          <div className="pile-box" id="legend_box">
+            <div className="pile-title" id="legend_title">Legend</div>
+            <div className="legend-content" id="legend_content">
+              <div>• Bank = Golden fund (shared {TOTAL_MONEY_TOKENS} tokens)</div>
+              <div>• Draw pile, Reserve pile, Discard pile — standardized names</div>
+            </div>
+          </div>
           <div className="pile-box pile-discard" id="pile_discard" onDragOver={(e: React.DragEvent) => e.preventDefault()} onDrop={onDiscardDrop}>
-            <div className="pile-title" id="pile_discard_title">Discard</div>
+            <div className="pile-title" id="pile_discard_title">Discard pile</div>
             <div className="pile-count" id="pile_discard_count">{view?.shared?.discardCount ?? 0}</div>
           </div>
           <div className="pile-box log-box" id="game_log">
