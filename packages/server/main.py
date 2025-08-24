@@ -502,10 +502,17 @@ async def start_attack(sid, data):
     if not attacker_slots:
         return
     op_pid = "P2" if pid == "P1" else "P1"
+    # Only the active player can initiate an attack
+    if pid != getattr(st, "active_player", None):
+        return
     # Validate indices
     if target_slot < 0 or target_slot >= len(st.players[op_pid].slots):
         return
+    # Target must have a card
+    if st.players[op_pid].slots[target_slot].card is None:
+        return
     valid_attackers: List[int] = []
+    factions: List[str] = []
     for i in attacker_slots:
         if 0 <= i < len(st.players[pid].slots):
             s = st.players[pid].slots[i]
@@ -513,10 +520,16 @@ async def start_attack(sid, data):
                 atk = int(getattr(s.card, "atk", 0)) if s.card else 0
             except Exception:
                 atk = 0
-            if s.card is not None and atk > 0:
+            faction = ((getattr(s.card, "faction", "") or "").strip() if s.card else "")
+            if s.card is not None and atk > 0 and faction:
                 valid_attackers.append(i)
+                factions.append(faction)
     if not valid_attackers:
         return
+    # Enforce same-faction attackers
+    if len(set(factions)) != 1:
+        return
+    # No limit on number of attackers (removed 2-attacker restriction)
     # Initialize attack meta
     r["attack"] = {
         "attacker": pid,

@@ -58,7 +58,7 @@ Total: 37 cards in deck (+ 3 Bosses outside deck).
 - **HP**: health points (card destroyed when HP ≤ 0)
 - **Attack**: damage when attacking
 - **Caste**: caste (gangsters, authorities, loners) - intra-caste synergies
-- **Faction**: faction (heads, specialists, stormers, healers, slippery) - cross-caste synergies
+- **Faction**: faction (heads, specialists, stormers, slippery) - cross-caste synergies
 - **Defend (D)**: base shield limit (🛡️) for this card. Effective shield limit = `min(4, D + Authority_auras)`.
 - **Rage**: per-card attack aura. Adds +R ATK to every attacking card you control (i.e., a combined attack of N cards gets +N×R). Stacks across multiple sources.
 - **Authority**: aura increasing shield limit of all your cards by +N while source is in play
@@ -121,6 +121,9 @@ Source of truth: `config/cards.csv` file. Current values:
 
 #### 3.2.3 Attack Opponent
 - Select attacking cards (ATK > 0)
+- Only cards of the same faction can be selected together for a combined attack (max 2 cards).
+- Cards without a faction cannot be selected as attackers.
+- UI: the first selected attacker gets a red border; a second card can only be selected (red border) if it shares the same faction.
 - Total damage: ATK + Rage + ammunition (💰 for enhancement)
 - Damage absorption order: 🛡️ → card HP
 - Destroyed 🛡️ go to shared Bank
@@ -147,9 +150,12 @@ Turn passes to next player clockwise
 - **Heads**: Leadership abilities
 - **Specialists**: Economic and technical effects
 - **Stormers**: Enhanced attack and aggressive abilities
-- **Healers**: Defensive abilities and restoration
 - **Slippery**: Evasion, stealth, economic manipulation
-- **Solo**: Neutral faction with unique abilities
+
+Distribution guideline (deck composition):
+- Heads + Specialists + Stormers together ≈ 80% of all cards
+- Slippery ≈ 10%
+- Remaining ≈ 10% are neutral/solo or non-factioned cards and events/actions
 
 Note: faction cascades are disabled in this version and will be added later.
 
@@ -174,7 +180,9 @@ Notes:
 - **Destruction**: when HP ≤ 0 card goes to Discard Pile.
 
 ### 6.2 Combined Attacks
-- Can attack with multiple cards simultaneously
+- Up to 2 cards can attack together in a combined attack
+- All selected attackers must share the same faction
+- Cards without a faction cannot join combined attacks
 - Can remove defense first, then attack
 - Can bribe defenders, then attack
 
@@ -236,7 +244,7 @@ Notes:
 
 ### 9.1 Strategy Selection
 - **Aggressive**: fast attacks, many Stormers
-- **Defensive**: accumulating Healers, resource management
+- **Defensive**: shield stacking and Authority auras, resource management
 - **Economic**: Specialists, card bribery
 - **Hybrid**: balanced development
 

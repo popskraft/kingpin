@@ -81,7 +81,7 @@ function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0 }: { card:
         </div>
       )}
       {card.faction ? (
-        <div className="card-row card-faction">Faction: <b>{card.faction}</b></div>
+        <div className="card-row card-faction"><b>{card.faction}</b></div>
       ) : null}
       <div className="card-notes">{card.notes}</div>
     </div>
@@ -518,12 +518,25 @@ export default function App(): JSX.Element {
   }
   const onBoardMouseLeave = () => emitCursor(0, 0, false)
 
-  // Attack selection handlers
+  // Attack selection handlers (same-faction only, no limit on number, faction required)
   const toggleSelectAttacker = (i: number) => {
-    if (!you?.board?.[i]?.card) return
-    const atk = (you?.board?.[i]?.card?.atk ?? 0)
+    const card = you?.board?.[i]?.card
+    if (!card) return
+    const atk = (card.atk ?? 0)
+    const faction = (card.faction || '').trim()
     if (atk <= 0) return
-    setSelectedAttackers((prev) => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])
+    if (!faction) return // non-faction cards cannot be selected
+    setSelectedAttackers(prev => {
+      // If already selected, toggle off
+      if (prev.includes(i)) return prev.filter(x => x !== i)
+      // Enforce same-faction when adding new attacker
+      if (prev.length >= 1) {
+        const first = you?.board?.[prev[0]]?.card
+        const firstFaction = (first?.faction || '').trim()
+        if (!firstFaction || firstFaction !== faction) return prev
+      }
+      return [...prev, i]
+    })
   }
   const clearAttackSelection = () => { 
     setSelectedAttackers([])
@@ -998,12 +1011,11 @@ export default function App(): JSX.Element {
                   const defCard = defSlot?.card
                   const baseHP = defCard?.hp ?? 0
                   const shields = defSlot?.muscles ?? 0
-                  const synergyDefHp = synergyHpBonusForBoard(opp?.board)
-                  const totalHP = baseHP + shields + synergyDefHp
+                  const totalHP = baseHP + shields
                   return (
                     <>
                       <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${selectedAttackers.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${selectedAttackers.length}×${perCardSynergyR}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{synergyDefHp > 0 ? ' + 1' : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
@@ -1127,13 +1139,12 @@ export default function App(): JSX.Element {
                   const defCard = defSlot?.card
                   const baseHP = defCard?.hp ?? 0
                   const shields = defSlot?.muscles ?? 0
-                  const synergyDefHp = synergyHpBonusForBoard(defBoard)
-                  const totalHP = baseHP + shields + synergyDefHp
+                  const totalHP = baseHP + shields
 
                   return (
                     <>
                       <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${attack.attackerSlots.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${attack.attackerSlots.length}×${perCardSynergyR}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''}{synergyDefHp > 0 ? ' + 1' : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
