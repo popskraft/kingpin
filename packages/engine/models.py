@@ -47,6 +47,11 @@ class Card(BaseModel):
     meta: Dict[str, int | str | bool] = Field(default_factory=dict)
     # Короткое текстовое описание для игрока (отображение на карте/в UI)
     notes: str = ""
+    # Полевые бонусы синергии парами (2+ карты одной касты/фракции). Применяются ПО-КАРТОЧНО
+    # при активной парной синергии на стороне. Эти поля опциональны и по умолчанию равны 0.
+    pair_hp: int = 0
+    pair_d: int = 0
+    pair_r: int = 0
 
     @root_validator(pre=True)
     def _migrate_inf_to_abl(cls, values):  # type: ignore[override]

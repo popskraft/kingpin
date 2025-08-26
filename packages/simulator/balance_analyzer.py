@@ -50,11 +50,14 @@ class BalanceAnalyzer:
                 independence = self._parse_numeric(row['Independence'])
                 in_deck = row['В_колоде'] == '✓'
                 
+                # Prefer new header 'Клан', fallback to legacy 'Каста'
+                clan_value = row.get('Клан') or row.get('Каста') or ''
+
                 card = Card(
                     id=row['ID'],
                     name=row['Название'],
                     type=row['Тип'],
-                    caste=row['Каста'],
+                    caste=clan_value,
                     faction=row['Фракция'],
                     hp=hp,
                     atk=atk,
@@ -200,7 +203,7 @@ class BalanceAnalyzer:
     
     def analyze_caste_balance(self) -> Dict[str, Dict[str, float]]:
         """
-        Анализ баланса кастов
+        Анализ баланса кланов
         """
         caste_stats = {}
         
@@ -224,7 +227,7 @@ class BalanceAnalyzer:
             avg_survivability = sum(self.calculate_survivability_index(c) for c in caste_cards) / total_cards
             avg_overall_rating = sum(self.calculate_card_overall_rating(c) for c in caste_cards) / total_cards
             
-            # Специализация касты
+            # Специализация клана
             faction_distribution = defaultdict(int)
             for card in caste_cards:
                 if card.faction != 'n/a':
@@ -249,7 +252,7 @@ class BalanceAnalyzer:
     
     def _calculate_specialization_score(self, cards: List[Card]) -> float:
         """
-        Оценка специализации касты (насколько уникальны её карты)
+        Оценка специализации клана (насколько уникальны его карты)
         """
         if not cards:
             return 0.0
@@ -263,7 +266,7 @@ class BalanceAnalyzer:
         if not faction_counts:
             return 0.0
             
-        # Расчет энтропии распределения (чем выше, тем более разнообразна каста)
+        # Расчет энтропии распределения (чем выше, тем более разнообразен клан)
         total = sum(faction_counts.values())
         entropy = 0.0
         for count in faction_counts.values():
@@ -288,9 +291,9 @@ class BalanceAnalyzer:
         report += "- **SI (Survivability Index)**: HP + (Defend × 2) - (Corruption_Risk × 2)\n"
         report += "- **COR (Card Overall Rating)**: (CPR × 0.3) + (AV × 0.4) + (CE × 0.2) + (SI × 0.1)\n\n"
         
-        report += "## Анализ по кастам\n\n"
+        report += "## Анализ по кланам\n\n"
         
-        # Сортировка кастов по общему рейтингу
+        # Сортировка кланов по общему рейтингу
         sorted_castes = sorted(caste_stats.items(), 
                              key=lambda x: x[1]['avg_overall_rating'], 
                              reverse=True)
@@ -331,14 +334,14 @@ class BalanceAnalyzer:
             elif balance_gap > 0.5:
                 report += "⚡ **УМЕРЕННЫЙ ДИСБАЛАНС** - требуется корректировка\n"
             else:
-                report += "✅ **ХОРОШИЙ БАЛАНС** - касты примерно равны\n"
+                report += "✅ **ХОРОШИЙ БАЛАНС** - кланы примерно равны\n"
             
             # Конкретные рекомендации
             weakest_caste = min(sorted_castes, key=lambda x: x[1]['avg_overall_rating'])
             strongest_caste = max(sorted_castes, key=lambda x: x[1]['avg_overall_rating'])
             
-            report += f"\n**Самая слабая каста**: {weakest_caste[0]} ({weakest_caste[1]['avg_overall_rating']:.2f})\n"
-            report += f"**Самая сильная каста**: {strongest_caste[0]} ({strongest_caste[1]['avg_overall_rating']:.2f})\n"
+            report += f"\n**Самый слабый клан**: {weakest_caste[0]} ({weakest_caste[1]['avg_overall_rating']:.2f})\n"
+            report += f"**Самый сильный клан**: {strongest_caste[0]} ({strongest_caste[1]['avg_overall_rating']:.2f})\n"
         
         return report
     

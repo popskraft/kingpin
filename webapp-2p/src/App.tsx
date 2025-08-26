@@ -41,7 +41,28 @@ function getCasteIcon(caste?: string): string | null {
   return '🎴'
 }
 
-function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0 }: { card: Card | null, faceUp: boolean, bonusHp?: number, bonusD?: number, bonusR?: number }) {
+function getClanStripeClass(card: Card): string {
+  // Определяем цвет полоски по клану (приоритет) или фракции
+  const clanRaw = (card.caste || '').toLowerCase()
+  const factionRaw = (card.faction || '').toLowerCase()
+  
+  // Кланы имеют приоритет над фракциями
+  if (clanRaw === 'gangsters') return 'gangsters'
+  if (clanRaw === 'authorities') return 'authorities'
+  if (clanRaw === 'loners') return 'loners'
+  if (clanRaw === 'solo') return 'solo'
+  
+  // Фракции как запасной вариант
+  if (factionRaw.includes('specialist')) return 'specialists'
+  if (factionRaw.includes('head')) return 'heads'
+  if (factionRaw.includes('stormer')) return 'stormers'
+  if (factionRaw.includes('slippery')) return 'slippery'
+  if (factionRaw && factionRaw !== 'n/a') return 'faction'
+  
+  return ''
+}
+
+function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo = null }: { card: Card | null, faceUp: boolean, bonusHp?: number, bonusD?: number, bonusR?: number, pairInfo?: { hp: number, d: number, r: number } | null }) {
   if (!card) return (
     <div className="card empty">
       <div className="card-title">—</div>
@@ -56,11 +77,35 @@ function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0 }: { card:
   const atkDisp = (card.atk ?? 0)
   const defDisp = (card.d ?? 0) + (bonusD || 0)
   const rageDisp = (card.rage ?? 0) + (bonusR || 0)
+  const hasActivePair = !!(pairInfo && ((pairInfo.hp ?? 0) !== 0 || (pairInfo.d ?? 0) !== 0 || (pairInfo.r ?? 0) !== 0))
+  // Клан (caste) - основная группировка для синергии
+  const clanRaw = (card.caste || '').toLowerCase()
+  const factionRaw = (card.faction || '').toLowerCase()
+  
+  // Определяем цвет полоски по клану (приоритет) или фракции
+  const stripeClan = clanRaw === 'gangsters' ? 'gangsters'
+    : clanRaw === 'authorities' ? 'authorities'
+    : clanRaw === 'loners' ? 'loners'
+    : clanRaw === 'solo' ? 'solo'
+    : factionRaw.includes('specialist') ? 'specialists'
+    : factionRaw.includes('head') ? 'heads'
+    : factionRaw.includes('stormer') ? 'stormers'
+    : factionRaw.includes('slippery') ? 'slippery'
+    : factionRaw ? 'faction'
+    : ''
+  // Полоска клана/фракции (всегда показывается)
+  const clanStripeClass = getClanStripeClass(card)
+  
   return (
     <div className="card">
+      {clanStripeClass ? <div className={`clan-stripe ${clanStripeClass}`} title={`Клан/Фракция: ${clanStripeClass}`} /> : null}
+      {hasActivePair && stripeClan ? <div className={`synergy-stripe ${stripeClan}`} title={`Синергия пары: ${stripeClan}`} /> : null}
       <div className="card-title">
         {card.caste ? <span className="caste-icon" title={`Caste: ${card.caste}`}>{getCasteIcon(card.caste)}</span> : null}
         {card.name}
+        {hasActivePair ? (
+          <span className="pair-badge" title={`Pair synergy +HP/+D/+R: ${pairInfo.hp}/${pairInfo.d}/${pairInfo.r}`}> 🔗</span>
+        ) : null}
       </div>
       <div className="card-illustration" aria-hidden="true">{getCardEmoji(card)}</div>
       <div className="card-row card-stats">
@@ -143,8 +188,8 @@ function AnimatedNumber({ value, className }: { value: number, className?: strin
   return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
 }
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard, onHoverStart, onHoverEnd, onDragAnyStart, onDragAnyEnd, onSlotDragStart, bonusHp = 0, bonusD = 0, bonusR = 0 }:
-  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void, onHoverStart?: () => void, onHoverEnd?: () => void, onDragAnyStart?: () => void, onDragAnyEnd?: () => void, onSlotDragStart?: (index: number) => void, bonusHp?: number, bonusD?: number, bonusR?: number }): JSX.Element {
+function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard, onHoverStart, onHoverEnd, onDragAnyStart, onDragAnyEnd, onSlotDragStart, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo = null }:
+  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void, onHoverStart?: () => void, onHoverEnd?: () => void, onDragAnyStart?: () => void, onDragAnyEnd?: () => void, onSlotDragStart?: (index: number) => void, bonusHp?: number, bonusD?: number, bonusR?: number, pairInfo?: { hp: number, d: number, r: number } | null }): JSX.Element {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
@@ -218,7 +263,7 @@ function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenP
       </div>
       <div className="slot-inner">
         <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDragEnd={onDragAnyEnd} onDoubleClick={onFlip} onClick={onClickCard} onMouseEnter={onHoverStart} onMouseLeave={onHoverEnd}>
-          <CardView card={slot.card} faceUp={slot.face_up} bonusHp={bonusHp} bonusD={bonusD} bonusR={bonusR} />
+          <CardView card={slot.card} faceUp={slot.face_up} bonusHp={bonusHp} bonusD={bonusD} bonusR={bonusR} pairInfo={pairInfo} />
         </div>
       </div>
     </div>
@@ -386,6 +431,36 @@ export default function App(): JSX.Element {
   const synergyDBonusForBoard = (sideBoard?: Slot[]): number => {
     const k = detectCasteSynergyKey(sideBoard)
     return (k === 'gangsters' || k === 'authorities') ? 1 : 0
+  }
+  
+  // New: Pair-based synergy (2+ cards same clan or same faction as the target) and per-card bonuses
+  const hasPairSynergyForCard = (sideBoard?: Slot[], card?: Card | null): boolean => {
+    if (!card) return false
+    const board = sideBoard || []
+    const cardCaste = (card.caste || '').trim().toLowerCase()
+    const cardFaction = (card.faction || '').trim()
+    const sameCaste = board.filter(sl => (sl.card?.caste || '').trim().toLowerCase() === cardCaste).length >= 2
+    const sameFaction = board.filter(sl => (sl.card?.faction || '').trim() === cardFaction).length >= 2
+    return sameCaste || sameFaction
+  }
+
+  const classifyCaste = (caste?: string): 'gangsters' | 'authorities' | 'loners' | null => {
+    const c = (caste || '').toLowerCase()
+    if (!c) return null
+    if (c.includes('gang')) return 'gangsters'
+    if (c.includes('author')) return 'authorities'
+    if (c.includes('loner') || c.includes('solo')) return 'loners'
+    return null
+  }
+
+  const synergyBonusesForCardPair = (sideBoard?: Slot[], card?: Card | null): { hp: number, d: number, r: number } => {
+    if (!card) return { hp: 0, d: 0, r: 0 }
+    if (!hasPairSynergyForCard(sideBoard, card)) return { hp: 0, d: 0, r: 0 }
+    // Use the per-card pair_* fields provided by the backend
+    const hp = card.pair_hp ?? 0
+    const d = card.pair_d ?? 0
+    const r = card.pair_r ?? 0
+    return { hp, d, r }
   }
 
   const ragePerCardYou = useMemo(() => calcRagePerCard(you?.board), [you?.board])
@@ -697,15 +772,22 @@ export default function App(): JSX.Element {
                   slot={s}
                   index={i}
                   editable={false}
-                  owner="opponent"
+                  owner={'opponent'}
                   extraClassName={selectedAttackers.length > 0 && s.card ? 'targetable' : ''}
                   onClickCard={() => handleTargetClick(i)}
                   onHoverStart={() => handlePreviewHoverStart(s.card, s.face_up, 'opponent')}
                   onHoverEnd={handlePreviewHoverEnd}
                   onDragAnyStart={handlePreviewHoverEnd}
-                  bonusHp={synergyHpBonusForBoard(opp?.board)}
-                  bonusD={synergyDBonusForBoard(opp?.board)}
-                  bonusR={synergyRForBoard(opp?.board)}
+                  bonusHp={synergyBonusesForCardPair(opp?.board, s.card).hp}
+                  bonusD={synergyBonusesForCardPair(opp?.board, s.card).d}
+                  bonusR={synergyBonusesForCardPair(opp?.board, s.card).r}
+                  pairInfo={(() => { 
+                    if (!s?.card) return null
+                    const active = hasPairSynergyForCard(opp?.board, s.card)
+                    if (!active) return null
+                    const p = synergyBonusesForCardPair(opp?.board, s.card)
+                    return (p.hp||p.d||p.r) ? p : null 
+                  })()}
                 />
               ))}
             </div>
@@ -717,7 +799,7 @@ export default function App(): JSX.Element {
                 <div className={`opp-synergy ${(() => { const k = detectCasteSynergyKey(opp?.board); return k ? 'caste-' + k : '' })()}`} id="opp_synergy">
                   <div className="synergy-title">Synergy</div>
                   <div className="synergy-row">
-                    <span className="synergy-label">Каста:</span>{' '}
+                    <span className="synergy-label">Клан:</span>{' '}
                     {oppCasteSynergy ? (<><b>{oppCasteSynergy.name}</b> → {oppCasteSynergy.effect}</>) : '—'}
                   </div>
                   {oppFactionSingle && (
@@ -768,9 +850,9 @@ export default function App(): JSX.Element {
                   onDragAnyStart={handlePreviewHoverEnd}
                   onSlotDragStart={(idx: number) => { handlePreviewHoverEnd(); setDragCardFrom({ from: 'slot', fromIndex: idx }) }}
                   onDragAnyEnd={() => setDragCardFrom(null)}
-                  bonusHp={synergyHpBonusForBoard(you?.board)}
-                  bonusD={synergyDBonusForBoard(you?.board)}
-                  bonusR={synergyRForBoard(you?.board)}
+                  bonusHp={synergyBonusesForCardPair(you?.board, s.card).hp}
+                  bonusD={synergyBonusesForCardPair(you?.board, s.card).d}
+                  bonusR={synergyBonusesForCardPair(you?.board, s.card).r}
                 />
               ))}
             </div>
@@ -807,7 +889,7 @@ export default function App(): JSX.Element {
                 <div className={`your-synergy ${(() => { const k = detectCasteSynergyKey(you?.board); return k ? 'caste-' + k : '' })()}`} id="your_synergy">
                   <div className="synergy-title">Synergy</div>
                   <div className="synergy-row">
-                    <span className="synergy-label">Каста:</span>{' '}
+                    <span className="synergy-label">Клан:</span>{' '}
                     {yourCasteSynergy ? (<><b>{yourCasteSynergy.name}</b> → {yourCasteSynergy.effect}</>) : '—'}
                   </div>
                   {yourFactionSingle && (
@@ -905,22 +987,24 @@ export default function App(): JSX.Element {
                 <CardView 
                   card={preview.card} 
                   faceUp={preview.faceUp}
-                  bonusHp={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyHpBonusForBoard(b) })()}
-                  bonusD={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyDBonusForBoard(b) })()}
-                  bonusR={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyRForBoard(b) })()}
+                  bonusHp={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyBonusesForCardPair(b, preview.card).hp })()}
+                  bonusD={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyBonusesForCardPair(b, preview.card).d })()}
+                  bonusR={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; return synergyBonusesForCardPair(b, preview.card).r })()}
+                  pairInfo={(() => { const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined; if (!hasPairSynergyForCard(b, preview.card)) return null; const p = synergyBonusesForCardPair(b, preview.card); return (p.hp||p.d||p.r) ? p : null })()}
                 />
               </div>
             </div>
             <div className="preview-props">
               <div className="prop"><b>Тип:</b> {preview.card.type || '—'}</div>
               <div className="prop"><b>Фракция:</b> {preview.card.faction || '—'}</div>
-              <div className="prop"><b>Каста:</b> {preview.card.caste || '—'}</div>
+              <div className="prop"><b>Клан:</b> {preview.card.caste || '—'}</div>
               {(() => {
                 const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined
-                const hp = (preview.card.hp ?? 0) + synergyHpBonusForBoard(b)
+                const pair = synergyBonusesForCardPair(b, preview.card)
+                const hp = (preview.card.hp ?? 0) + pair.hp
                 const atk = (preview.card.atk ?? 0)
-                const def = (preview.card.d ?? 0) + synergyDBonusForBoard(b)
-                const r = (preview.card.rage ?? 0) + synergyRForBoard(b)
+                const def = (preview.card.d ?? 0) + pair.d
+                const r = (preview.card.rage ?? 0) + pair.r
                 return (
                   <>
                     <div className="prop"><b>HP:</b> {hp}</div>
@@ -953,9 +1037,10 @@ export default function App(): JSX.Element {
                   <CardView 
                     card={opp?.board?.[localAttackModal.targetSlot]?.card ?? null} 
                     faceUp={opp?.board?.[localAttackModal.targetSlot]?.face_up ?? false}
-                    bonusHp={synergyHpBonusForBoard(opp?.board)}
-                    bonusD={synergyDBonusForBoard(opp?.board)}
-                    bonusR={synergyRForBoard(opp?.board)} 
+                    bonusHp={synergyBonusesForCardPair(opp?.board, opp?.board?.[localAttackModal.targetSlot]?.card ?? null).hp}
+                    bonusD={synergyBonusesForCardPair(opp?.board, opp?.board?.[localAttackModal.targetSlot]?.card ?? null).d}
+                    bonusR={synergyBonusesForCardPair(opp?.board, opp?.board?.[localAttackModal.targetSlot]?.card ?? null).r}
+                    pairInfo={(() => { const c = opp?.board?.[localAttackModal.targetSlot]?.card ?? null; if (!c) return null; if (!hasPairSynergyForCard(opp?.board, c)) return null; const p = synergyBonusesForCardPair(opp?.board, c); return (p.hp||p.d||p.r) ? p : null })()} 
                   />
                 </div>
                 {/* Interactive shields */}
@@ -999,13 +1084,14 @@ export default function App(): JSX.Element {
                   const atkCards = selectedAttackers.map(i => you?.board?.[i]?.card).filter(Boolean) as Card[]
                   const baseSum = atkCards.reduce((s, c) => s + (c.atk ?? 0), 0)
                   const perCardBaseR = ragePerCardYou
-                  const perCardSynergyR = synergyRForBoard(you?.board)
-                  const perCardBuff = perCardBaseR + perCardSynergyR
-                  const buffSum = (perCardBuff > 0 ? selectedAttackers.length * perCardBuff : 0)
-                  const shieldsOnAttackers = selectedAttackers.reduce((s, i) => s + (you?.board?.[i]?.muscles ?? 0), 0)
-                  const shieldsBonus = shieldsOnAttackers * 0.25
-                  const totalAtk = baseSum + buffSum + shieldsBonus
-                  // Defender HP
+                  const perCardPairRSum = selectedAttackers.reduce((s, i) => {
+                    const c = you?.board?.[i]?.card
+                    return s + (c ? synergyBonusesForCardPair(you?.board, c).r : 0)
+                  }, 0)
+                  const buffSum = (perCardBaseR > 0 ? selectedAttackers.length * perCardBaseR : 0) + perCardPairRSum
+                  // Shields no longer contribute to attack
+                  const totalAtk = baseSum + buffSum
+                  // Defender HP = base HP + shields (no D, no synergy)
                   const tSlot = localAttackModal.targetSlot
                   const defSlot = opp?.board?.[tSlot]
                   const defCard = defSlot?.card
@@ -1014,8 +1100,8 @@ export default function App(): JSX.Element {
                   const totalHP = baseHP + shields
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${selectedAttackers.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${selectedAttackers.length}×${perCardSynergyR}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${selectedAttackers.length}×${perCardBaseR}` : ''}{perCardPairRSum > 0 ? ` + pairR:${perCardPairRSum}` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели:</b> {`${baseHP}`}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
@@ -1129,11 +1215,12 @@ export default function App(): JSX.Element {
                   const perCardSynergyR = synergyRForBoard(attBoard)
                   const perCardBuff = perCardBaseR + perCardSynergyR
                   const buffSum = (perCardBuff > 0 ? attack.attackerSlots.length * perCardBuff : 0)
-                  const shieldsOnAttackers = attack.attackerSlots.reduce((s, i) => s + (attBoard?.[i]?.muscles ?? 0), 0)
-                  const shieldsBonus = shieldsOnAttackers * 0.25
-                  const totalAtk = baseSum + buffSum + shieldsBonus
+                  // Shields on attackers add +0.25 ATK each
+                  const shieldAtkCount = attack.attackerSlots.reduce((s, i) => s + (attBoard?.[i]?.muscles ?? 0), 0)
+                  const shieldAtk = shieldAtkCount * 0.25
+                  const totalAtk = baseSum + buffSum + shieldAtk
 
-                  // Defender HP
+                  // Defender HP = base HP + shields (no D, no synergy)
                   const tSlot = attack.target.slot
                   const defSlot = defBoard?.[tSlot]
                   const defCard = defSlot?.card
@@ -1143,8 +1230,8 @@ export default function App(): JSX.Element {
 
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${attack.attackerSlots.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${attack.attackerSlots.length}×${perCardSynergyR}` : ''}{shieldsOnAttackers > 0 ? ` + 0.25×${shieldsOnAttackers}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели (HP):</b> {baseHP}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${attack.attackerSlots.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${attack.attackerSlots.length}×${perCardSynergyR}` : ''}{shieldAtkCount > 0 ? ` + ${shieldAtkCount}×0.25` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Защита цели:</b> {`${baseHP}`}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}

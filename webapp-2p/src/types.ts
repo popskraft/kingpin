@@ -11,6 +11,10 @@ export type Card = {
   corruption?: number
   rage?: number
   notes?: string
+  // Optional per-card pair synergy bonuses (apply when pair synergy is active on the side)
+  pair_hp?: number
+  pair_d?: number
+  pair_r?: number
 }
 
 export type Slot = {

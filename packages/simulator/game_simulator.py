@@ -439,10 +439,10 @@ class GameSimulator:
         report += f"- Всего игр: {tournament_data['total_games']}\n"
         report += f"- Матчапов: {len(tournament_data['tournament_results'])}\n\n"
         
-        # Общий рейтинг кастов по винрейту
+        # Общий рейтинг кланов по винрейту
         sorted_castes = sorted(caste_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
         
-        report += "## Общий рейтинг кастов\n\n"
+        report += "## Общий рейтинг кланов\n\n"
         for i, (caste, stats) in enumerate(sorted_castes, 1):
             report += f"{i}. **{caste.upper()}**\n"
             report += f"   - Винрейт: {stats['win_rate']:.1f}%\n"
@@ -480,7 +480,7 @@ class GameSimulator:
         strongest_caste = max(sorted_castes, key=lambda x: x[1]['win_rate'])
         weakest_caste = min(sorted_castes, key=lambda x: x[1]['win_rate'])
         
-        report += f"\n**Самая сильная каста**: {strongest_caste[0]} ({strongest_caste[1]['win_rate']:.1f}%)\n"
-        report += f"**Самая слабая каста**: {weakest_caste[0]} ({weakest_caste[1]['win_rate']:.1f}%)\n"
+        report += f"\n**Самый сильный клан**: {strongest_caste[0]} ({strongest_caste[1]['win_rate']:.1f}%)\n"
+        report += f"**Самый слабый клан**: {weakest_caste[0]} ({weakest_caste[1]['win_rate']:.1f}%)\n"
         
         return report

@@ -17,10 +17,15 @@ def main():
     parser = argparse.ArgumentParser(description='Kingpin Game Simulator')
     parser.add_argument('--mode', choices=['matchup', 'tournament'], default='tournament',
                        help='Режим симуляции: matchup (один матчап) или tournament (полный турнир)')
+    # Preferred options: clans (backward compatible aliases: caste1/caste2)
+    parser.add_argument('--clan1', choices=['gangsters', 'authorities', 'loners', 'solo'],
+                       help='Первый клан для режима matchup')
+    parser.add_argument('--clan2', choices=['gangsters', 'authorities', 'loners', 'solo'],
+                       help='Второй клан для режима matchup')
     parser.add_argument('--caste1', choices=['gangsters', 'authorities', 'loners', 'solo'],
-                       help='Первая каста для режима matchup')
+                       help='[legacy] Первая каста для режима matchup')
     parser.add_argument('--caste2', choices=['gangsters', 'authorities', 'loners', 'solo'],
-                       help='Вторая каста для режима matchup')
+                       help='[legacy] Вторая каста для режима matchup')
     parser.add_argument('--games', type=int, default=100,
                        help='Количество игр на матчап (по умолчанию: 100)')
     parser.add_argument('--output', type=str,
@@ -42,33 +47,35 @@ def main():
     simulator = GameSimulator(cards_file)
     
     if args.mode == 'matchup':
-        if not args.caste1 or not args.caste2:
-            print("Ошибка: для режима matchup необходимо указать --caste1 и --caste2")
+        clan1 = args.clan1 or args.caste1
+        clan2 = args.clan2 or args.caste2
+        if not clan1 or not clan2:
+            print("Ошибка: для режима matchup необходимо указать --clan1 и --clan2 (или legacy: --caste1 и --caste2)")
             sys.exit(1)
         
-        print(f"⚔️ Симулируем матчап: {args.caste1.upper()} vs {args.caste2.upper()}")
+        print(f"⚔️ Симулируем матчап: {clan1.upper()} vs {clan2.upper()}")
         print(f"🎲 Количество игр: {args.games}")
         
-        result = simulator.run_matchup_simulation(args.caste1, args.caste2, args.games)
+        result = simulator.run_matchup_simulation(clan1, clan2, args.games)
         
         # Выводим результаты
         print(f"\n📊 РЕЗУЛЬТАТЫ МАТЧАПА:")
-        print(f"🏆 {args.caste1.upper()}: {result['win_rates'][args.caste1]:.1f}% ({result['wins'][args.caste1]} побед)")
-        print(f"🏆 {args.caste2.upper()}: {result['win_rates'][args.caste2]:.1f}% ({result['wins'][args.caste2]} побед)")
+        print(f"🏆 {clan1.upper()}: {result['win_rates'][clan1]:.1f}% ({result['wins'][clan1]} побед)")
+        print(f"🏆 {clan2.upper()}: {result['win_rates'][clan2]:.1f}% ({result['wins'][clan2]} побед)")
         print(f"🤝 Ничьи: {result['win_rates']['Draw']:.1f}% ({result['wins']['Draw']})")
         print(f"⏱️ Средняя длина игры: {result['avg_game_length']:.1f} ходов")
         
         # Простой отчет для одного матчапа
-        report = f"# Результаты матчапа {args.caste1.upper()} vs {args.caste2.upper()}\n\n"
+        report = f"# Результаты матчапа {clan1.upper()} vs {clan2.upper()}\n\n"
         report += f"**Игр сыграно:** {args.games}\n\n"
         report += f"## Результаты\n"
-        report += f"- **{args.caste1.upper()}**: {result['win_rates'][args.caste1]:.1f}% ({result['wins'][args.caste1]} побед)\n"
-        report += f"- **{args.caste2.upper()}**: {result['win_rates'][args.caste2]:.1f}% ({result['wins'][args.caste2]} побед)\n"
+        report += f"- **{clan1.upper()}**: {result['win_rates'][clan1]:.1f}% ({result['wins'][clan1]} побед)\n"
+        report += f"- **{clan2.upper()}**: {result['win_rates'][clan2]:.1f}% ({result['wins'][clan2]} побед)\n"
         report += f"- **Ничьи**: {result['win_rates']['Draw']:.1f}% ({result['wins']['Draw']})\n\n"
         report += f"**Средняя длина игры:** {result['avg_game_length']:.1f} ходов\n"
         
     else:  # tournament mode
-        print(f"🏟️ Запуск полного турнира между всеми кастами")
+        print(f"🏟️ Запуск полного турнира между всеми кланами")
         print(f"🎲 Игр на матчап: {args.games}")
         print("⏳ Это может занять некоторое время...")
         
@@ -92,7 +99,7 @@ def main():
         report_file = args.output
     else:
         if args.mode == 'matchup':
-            report_file = f"matchup_{args.caste1}_vs_{args.caste2}_report.md"
+            report_file = f"matchup_{clan1}_vs_{clan2}_report.md"
         else:
             report_file = "tournament_simulation_report.md"
     
@@ -116,7 +123,7 @@ def main():
         elif balance_gap > 10:
             print("⚡ УМЕРЕННЫЙ ДИСБАЛАНС - рекомендуется балансировка")
         else:
-            print("✅ ХОРОШИЙ БАЛАНС - касты примерно равны по силе")
+            print("✅ ХОРОШИЙ БАЛАНС - кланы примерно равны по силе")
 
 if __name__ == "__main__":
     main()

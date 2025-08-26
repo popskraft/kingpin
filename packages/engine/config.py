@@ -25,6 +25,8 @@ GAME_CONSTANTS = {
     'init_visible_slots': 6,
     'total_tokens': 40,
     'base_tokens_per_caste': 12,
+    # Alias for terminology migration: castes -> clans
+    'base_tokens_per_clan': 12,
     'additional_tokens': 4,
     'hand_limit': 6,
 }
@@ -35,6 +37,8 @@ CSV_COLUMN_MAPPINGS = {
     'name': ['Name', 'Название'],
     'type': ['Type', 'Тип'],
     'faction': ['Faction', 'Фракция'],
+    # Prefer new terminology "Clan/Клан", keep legacy "Caste/Каста" for backward compatibility
+    'clan': ['Clan', 'Клан'],
     'caste': ['Caste', 'Каста'],
     'hp': ['HP'],
     'atk': ['ATK'],
@@ -46,6 +50,10 @@ CSV_COLUMN_MAPPINGS = {
     'notes': ['Description', 'Описание'],
     'in_deck': ['InDeck', 'В_колоде', 'In Deck'],
     'independence': ['Independence'],
+    # Optional pair-based synergy fields (per-card bonuses when pair synergy is active)
+    'pair_hp': ['PairHP', 'Pair HP', 'Pair_Hp', 'HP_pair'],
+    'pair_d': ['PairD', 'Pair D', 'Pair_D', 'D_pair', 'Defend_pair'],
+    'pair_r': ['PairR', 'Pair Rage', 'Pair_R', 'R_pair', 'Rage_pair'],
 }
 
 def get_path(key: str) -> Path:
