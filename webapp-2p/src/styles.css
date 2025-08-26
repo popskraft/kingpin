@@ -108,12 +108,12 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 
 /* Clan stripe - always visible on top of cards */
 .clan-stripe { position: absolute; top: -2px; left: -2px; right: -2px; height: 6px; border-top-left-radius: 10px; border-top-right-radius: 10px; z-index: 1; opacity: 0.8; }
-/* Кланы (основные группировки) */
+/* Clans (main groups) */
 .clan-stripe.gangsters { background: #f6e05e; /* yellow */ }
 .clan-stripe.authorities { background: #63b3ed; /* blue */ }
 .clan-stripe.loners { background: #b794f4; /* purple */ }
 .clan-stripe.solo { background: #68d391; /* green */ }
-/* Фракции (специализации) */
+/* Factions (specializations) */
 .clan-stripe.specialists { background: #ff6b6b; /* red */ }
 .clan-stripe.heads { background: #4ecdc4; /* teal */ }
 .clan-stripe.stormers { background: #ff9500; /* orange */ }
@@ -122,12 +122,12 @@ section h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transfo
 
 /* Synergy stripe for active pair synergy - appears below clan stripe */
 .synergy-stripe { position: absolute; top: 4px; left: -2px; right: -2px; height: 4px; border-radius: 2px; z-index: 2; }
-/* Кланы (основные группировки) */
+/* Clans (main groups) */
 .synergy-stripe.gangsters { background: #f6e05e; /* yellow */ }
 .synergy-stripe.authorities { background: #63b3ed; /* blue */ }
 .synergy-stripe.loners { background: #b794f4; /* purple */ }
 .synergy-stripe.solo { background: #68d391; /* green */ }
-/* Фракции (специализации) */
+/* Factions (specializations) */
 .synergy-stripe.specialists { background: #ff6b6b; /* red */ }
 .synergy-stripe.heads { background: #4ecdc4; /* teal */ }
 .synergy-stripe.stormers { background: #ff9500; /* orange */ }

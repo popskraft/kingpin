@@ -31,15 +31,18 @@ GAME_CONSTANTS = {
     'hand_limit': 6,
 }
 
-# CSV column mappings for flexibility
+"""CSV column mappings (English-only)
+Defines the allowed English column headers for CSV import. Legacy English aliases
+are supported (e.g., Caste), but non-English headers are not recognized.
+"""
 CSV_COLUMN_MAPPINGS = {
     'id': ['ID', 'Id'],
-    'name': ['Name', 'Название'],
-    'type': ['Type', 'Тип'],
-    'faction': ['Faction', 'Фракция'],
-    # Prefer new terminology "Clan/Клан", keep legacy "Caste/Каста" for backward compatibility
-    'clan': ['Clan', 'Клан'],
-    'caste': ['Caste', 'Каста'],
+    'name': ['Name'],
+    'type': ['Type'],
+    'faction': ['Faction'],
+    # Prefer new terminology "Clan"; keep legacy English-only "Caste" for backward compatibility
+    'clan': ['Clan'],
+    'caste': ['Caste'],
     'hp': ['HP'],
     'atk': ['ATK'],
     'defend': ['Defend', 'D'],
@@ -47,8 +50,8 @@ CSV_COLUMN_MAPPINGS = {
     'corruption': ['Corruption'],
     'rage': ['Rage'],
     'abl': ['ABL'],
-    'notes': ['Description', 'Описание'],
-    'in_deck': ['InDeck', 'В_колоде', 'In Deck'],
+    'notes': ['Description'],
+    'in_deck': ['InDeck', 'In Deck'],
     'independence': ['Independence'],
     # Optional pair-based synergy fields (per-card bonuses when pair synergy is active)
     'pair_hp': ['PairHP', 'Pair HP', 'Pair_Hp', 'HP_pair'],

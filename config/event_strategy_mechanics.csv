@@ -1,0 +1,11 @@
+EventID,EventName,Description,Attack_Strategy_Effectiveness,Defense_Strategy_Effectiveness,Economy_Strategy_Effectiveness,Flexible_Strategy_Effectiveness,Attack_Strategy_Bonus,Defense_Strategy_Bonus,Economy_Strategy_Bonus,Flexible_Strategy_Bonus
+event_safe,Safe Cracked,Return up to 2 tokens from the discard to the reserve,0.3,0.7,0.9,0.5,0,0,0,0
+event_raid,Raid,Removes 1 thug from the opponent's first slot,0.8,0.4,0.6,0.6,0,0,0,0
+event_audit,Audit,Economy penalty,0.4,0.6,0.2,0.5,0,0,0,0
+event_crash,Market Crash,Economic crisis,0.6,0.8,0.1,0.4,0,0,0,0
+event_blackout,Blackout,Disables card abilities,0.5,0.5,0.5,0.5,0,0,0,0
+event_roundup,Roundup,Mass arrests,0.3,0.7,0.8,0.5,0,0,0,0
+event_war,Gang War,Conflict between groups,0.9,0.3,0.4,0.6,0,0,0,0
+event_bonus,Bonus,Gain additional money,0.4,0.6,0.9,0.7,0,0,0,0
+event_recruit,Recruitment,Manipulate henchmen,0.7,0.5,0.6,0.8,0,0,0,0
+event_disruption,Supply Disruption,Temporary restrictions,0.5,0.7,0.3,0.6,0,0,0,0

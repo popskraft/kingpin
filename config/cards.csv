@@ -1,45 +1,45 @@
-ID,Название,Тип,Клан,Фракция,HP,ATK,Price,Corruption,Defend,Rage,ABL,Independence,В_колоде,Описание,pair_hp,pair_d,pair_r
-gangster_valkyrie,Валькирия,common,gangsters,stormers,3,3,2,3,0,1,rage: 1,0,✓,+1 Атаки всем,0,1,1
-gangster_fighter,Боевик,common,gangsters,stormers,4,2,2,1,0,1,rage: 1,0,✓,Атакует при входе; +1 ATK за убийство (макс +1),0,1,1
-authority_swat,Спецназовец,common,authorities,stormers,5,3,3,0,1,1,tactical: 1,0,✓,Неподкупный; Атака 2 целей; +1 ATK со своей фракцией,1,1,0
-loner_sniper,Снайпер,common,loners,stormers,4,3,3,4,1,1,precision: 2,0,✓,Игнорирует всю 🛡️; Атакует карты в руке,1,0,1
-solo_killer,Киллер,common,solo,stormers,4,4,3,4,0,2,lethal: 1,0,✓,+1 урон; Игнор первого 🛡️,1,0,1
-gangster_racketeer,Рэкетир,common,gangsters,specialists,3,2,2,2,1,0,extort: 2,0,✓,Взять 2💰 или забрать любую карту себе ценой < 2,0,1,1
-authority_financier,Финансистка,common,authorities,specialists,4,2,2,1,2,0,economy: 2,1,✓,При входе +1💰; Экономика +1,1,1,0
-authority_investigator,Следователь,common,authorities,specialists,4,2,2,1,2,0,audit: 2,0,✓,Оппонент -1💰; Заморозить 1 карту на 1 ход,1,1,0
-loner_hacker,Хакер,common,loners,specialists,3,2,2,3,1,0,tech: 2,0,✓,-1🛡️ у врага при атаке (игнор 1 защиты),1,0,1
-loner_mechanic,Механик,common,loners,specialists,4,2,2,1,1,0,repair: 2,1,✓,Восстановить 1 карту из болота; Восст. +1 HP,1,0,1
-solo_informant,Информаторша,common,solo,specialists,3,1,1,4,1,0,intel: 2,0,✓,Смотри топ-3 колоды; +1🛡️ любой выбранной карте,1,0,1
-authority_commissar,Комиссар,common,authorities,specialists,5,3,3,2,2,1,discipline: 2,0,✓,D +1 🛡️ всем; Сопротивление коррупции,1,1,0
-solo_watchman,Дозорная,common,solo,specialists,4,2,2,2,3,0,guard: 2,0,✓,Блок первых 2 атак по руке,1,0,1
-gangster_thief,Вор,common,gangsters,slippery,3,1,1,4,0,0,steal: 1,0,✓,Взять 2💰 у противника 1 раз,0,1,1
-loner_trader,Торговка,common,loners,slippery,4,2,1,3,1,0,trade: 3,0,✓,Скидка 1💰; +1💰 за покупку; Продать карту за 1💰,1,0,1
-loner_driver,Водитель,common,loners,slippery,3,2,1,0,1,0,escape: 2,0,✓,Неподкупный; Забрать карты в руку по желанию,1,0,1
-solo_broker,Брокерша,common,solo,slippery,4,3,1,4,2,0,economy: 3,0,✓,"+2💰 при входе, +1💰 при сбросе карты ",1,0,1
-solo_agent,Агентка Проститутка,common,solo,slippery,2,1,2,2,1,1,seduce: 2,0,✓,+1 ATK всем; Подкупить карту за 2💰,1,0,1
-solo_hacker,Хакерша,common,solo,slippery,3,2,2,2,1,0,hack: 2,0,✓,-2🛡️ в ход с врагов; +1 ATK за взлом,1,0,1
-event_safe,Сейф вскрыт,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Возвращает до 2 жетонов из отбоя в резерв,0,0,0
-event_raid,Рейд,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Снимает 1 Братка с первого слота оппонента,0,0,0
-event_audit,Аудит,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Штраф по экономике,0,0,0
-event_crash,Обвал рынка,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Экономический кризис,0,0,0
-event_blackout,Отключение,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Блокирует способности карт,0,0,0
-event_roundup,Облава,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Массовые аресты,0,0,0
-event_war,Война банд,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Конфликт между группировками,0,0,0
-event_bonus,Премия,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Дополнительная сумма денег,0,0,0
-event_recruit,Вербовка,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Манипуляция с Братками,0,0,0
-event_disruption,Срыв поставки,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Временные ограничения,0,0,0
-token_gangster,Жетон-Братка (Гангстеры),token,gangsters,n/a,1,0.25,0,3,0,0,,0,✗,Защитная единица касты гангстеров,0,1,1
-token_authority,Жетон-Братка (Власти),token,authorities,n/a,1,0.25,0,2,0,0,,0,✗,Защитная единица касты властей,1,1,0
-token_loner,Жетон-Братка (Одиночки),token,loners,n/a,1,0.25,0,3,0,0,,0,✗,Защитная единица касты одиночек,1,0,1
-token_money,Жетон-Деньги,token,n/a,n/a,0,0,0,0,0,0,,0,✗,Денежная единица для покупок и усилений,0,0,0
-gangster_guard,Охранник,common,gangsters,specialists,3,2,2,2,1,0,guard: 1,0,✓,Перенаправляет урон; Восст. 1🛡️ при блоке,0,1,1
-authority_shieldbearer,Телохранители,common,authorities,specialists,6,2,3,1,3,0,guard: 1,0,✓,Блок по союзникам; +1🛡️ за блок; Восст. 1🛡️ всем в начале хода,1,1,0
-loner_nurse,Медсестра,common,loners,specialists,3,1,2,2,2,0,heal: 2,0,✓,+2 HP любой карте,1,0,1
-boss_gangster,Босс-Гангстер,boss,gangsters,heads,10,2,0,12,3,1,authority: 1,0,✗,D +1 🛡️ +1 Атаки,0,1,1
-boss_authority,Босс-Власть,boss,authorities,heads,10,2,0,12,3,1,authority: 1,0,✗,D +1 🛡️ +1 Атаки,1,1,0
-boss_loner,Босс-Одиночка,boss,loners,heads,10,2,0,12,3,1,authority: 1,0,✗,D +1 🛡️ +1 Атаки,1,0,1
-gangster_authority,Авторитет,common,gangsters,heads,6,1,5,2,2,0,authority: 1,0,✓,D +1 🛡️,0,1,1
-authority_prosecutor,Прокурор,common,authorities,heads,5,2,3,1,2,0,authority: 1,0,✓,D +1 🛡️ всем; Оппонент сбрасывает 1 карту,1,1,0
-unique_gangster,Крестный отец,unique,gangsters,heads,8,2,5,1,3,2,authority: 2; anti_corruption: all,0,✓,+2 Authority всем; Иммунитет к подкупу,0,1,1
-unique_authority,Генерал,unique,authorities,heads,8,3,4,1,3,3,authority: 2; discipline: all,0,✓,+2 Authority всем; D +1 🛡️ всем,1,1,0
-unique_loner,Легенда,unique,loners,heads,7,3,4,6,2,2,authority: 2; inspire: all,0,✓,+2 Authority всем; +1 ATK всем; Двойные способности,1,0,1
+ID,Name,Type,Clan,Faction,HP,ATK,Price,Corruption,Defend,Rage,ABL,Independence,InDeck,Description,PairHP,PairD,PairR
+gangster_valkyrie,Valkyrie,common,gangsters,stormers,3,3,2,3,0,1,rage: 1,0,✓,+1 ATK to all,0,1,1
+gangster_fighter,Fighter,common,gangsters,stormers,4,2,2,1,0,1,rage: 1,0,✓,Attacks on entry; +1 ATK per kill (max +1),0,1,1
+authority_swat,SWAT Operative,common,authorities,stormers,5,3,3,0,1,1,tactical: 1,0,✓,Unbribable; Attacks 2 targets; +1 ATK with same faction,1,1,0
+loner_sniper,Sniper,common,loners,stormers,4,3,3,4,1,1,precision: 2,0,✓,Ignores all shields; Attacks cards in hand,1,0,1
+solo_killer,Assassin,common,solo,stormers,4,4,3,4,0,2,lethal: 1,0,✓,+1 damage; Ignores the first shield,1,0,1
+gangster_racketeer,Racketeer,common,gangsters,specialists,3,2,2,2,1,0,extort: 2,0,✓,Take 2💰 or take any card with price < 2,0,1,1
+authority_financier,Financier,common,authorities,specialists,4,2,2,1,2,0,economy: 2,1,✓,+1💰 on entry; Economy +1,1,1,0
+authority_investigator,Investigator,common,authorities,specialists,4,2,2,1,2,0,audit: 2,0,✓,Opponent -1💰; Freeze 1 card for 1 turn,1,1,0
+loner_hacker,Hacker,common,loners,specialists,3,2,2,3,1,0,tech: 2,0,✓,-1🛡️ to the enemy when attacking (ignores 1 shield),1,0,1
+loner_mechanic,Mechanic,common,loners,specialists,4,2,2,1,1,0,repair: 2,1,✓,Return 1 card from the discard; Restore +1 HP,1,0,1
+solo_informant,Informant,common,solo,specialists,3,1,1,4,1,0,intel: 2,0,✓,Look at top 3 of the deck; +1🛡️ to any chosen card,1,0,1
+authority_commissar,Commissar,common,authorities,specialists,5,3,3,2,2,1,discipline: 2,0,✓,D +1🛡️ to all; Corruption resistance,1,1,0
+solo_watchman,Sentry,common,solo,specialists,4,2,2,2,3,0,guard: 2,0,✓,Blocks the first 2 attacks on your hand,1,0,1
+gangster_thief,Thief,common,gangsters,slippery,3,1,1,4,0,0,steal: 1,0,✓,Steal 2💰 from the opponent once,0,1,1
+loner_trader,Trader,common,loners,slippery,4,2,1,3,1,0,trade: 3,0,✓,Discount 1💰; +1💰 on purchase; Sell a card for 1💰,1,0,1
+loner_driver,Driver,common,loners,slippery,3,2,1,0,1,0,escape: 2,0,✓,Unbribable; Return cards to your hand as desired,1,0,1
+solo_broker,Broker,common,solo,slippery,4,3,1,4,2,0,economy: 3,0,✓,+2💰 on entry; +1💰 when discarding a card,1,0,1
+solo_agent,Undercover Escort,common,solo,slippery,2,1,2,2,1,1,seduce: 2,0,✓,+1 ATK to all; Bribe a card for 2💰,1,0,1
+solo_hacker,Hacker,common,solo,slippery,3,2,2,2,1,0,hack: 2,0,✓,-2🛡️ from enemies this turn; +1 ATK per hack,1,0,1
+event_safe,Safe Cracked,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Return up to 2 tokens from the discard to the reserve,0,0,0
+event_raid,Raid,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Removes 1 thug from the opponent's first slot,0,0,0
+event_audit,Audit,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Economy penalty,0,0,0
+event_crash,Market Crash,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Economic crisis,0,0,0
+event_blackout,Blackout,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Disables card abilities,0,0,0
+event_roundup,Roundup,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Mass arrests,0,0,0
+event_war,Gang War,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Conflict between groups,0,0,0
+event_bonus,Bonus,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Gain additional money,0,0,0
+event_recruit,Recruitment,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Manipulate henchmen,0,0,0
+event_disruption,Supply Disruption,event,n/a,n/a,0,0,0,0,0,0,,0,✓,Temporary restrictions,0,0,0
+token_gangster,Gangster Token,token,gangsters,n/a,1,0.25,0,3,0,0,,0,✗,Defensive unit of the Gangsters clan,0,1,1
+token_authority,Authority Token,token,authorities,n/a,1,0.25,0,2,0,0,,0,✗,Defensive unit of the Authorities clan,1,1,0
+token_loner,Loner Token,token,loners,n/a,1,0.25,0,3,0,0,,0,✗,Defensive unit of the Loners clan,1,0,1
+token_money,Money Token,token,n/a,n/a,0,0,0,0,0,0,,0,✗,Currency for purchases and upgrades,0,0,0
+gangster_guard,Guard,common,gangsters,specialists,3,2,2,2,1,0,guard: 1,0,✓,Redirects damage; Restores 1🛡️ when blocking,0,1,1
+authority_shieldbearer,Bodyguards,common,authorities,specialists,6,2,3,1,3,0,guard: 1,0,✓,Block for allies; +1🛡️ per block; Restore 1🛡️ to all at start of turn,1,1,0
+loner_nurse,Nurse,common,loners,specialists,3,1,2,2,2,0,heal: 2,0,✓,+2 HP to any card,1,0,1
+boss_gangster,Gangster Boss,boss,gangsters,heads,10,2,0,12,3,1,authority: 1,0,✗,D +1🛡️ +1 ATK,0,1,1
+boss_authority,Authority Boss,boss,authorities,heads,10,2,0,12,3,1,authority: 1,0,✗,D +1🛡️ +1 ATK,1,1,0
+boss_loner,Loner Boss,boss,loners,heads,10,2,0,12,3,1,authority: 1,0,✗,D +1🛡️ +1 ATK,1,0,1
+gangster_authority,Kingpin,common,gangsters,heads,6,1,5,2,2,0,authority: 1,0,✓,D +1🛡️,0,1,1
+authority_prosecutor,Prosecutor,common,authorities,heads,5,2,3,1,2,0,authority: 1,0,✓,D +1🛡️ to all; Opponent discards 1 card,1,1,0
+unique_gangster,Godfather,unique,gangsters,heads,8,2,5,1,3,2,authority: 2; anti_corruption: all,0,✓,+2 Authority to all; Immune to bribery,0,1,1
+unique_authority,General,unique,authorities,heads,8,3,4,1,3,3,authority: 2; discipline: all,0,✓,+2 Authority to all; D +1🛡️ to all,1,1,0
+unique_loner,Legend,unique,loners,heads,7,3,4,6,2,2,authority: 2; inspire: all,0,✓,+2 Authority to all; +1 ATK to all; Double abilities,1,0,1

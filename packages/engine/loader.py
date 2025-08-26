@@ -18,8 +18,8 @@ def load_yaml_config(path: str | Path) -> dict:
 
 
 def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List[Card]:
-    """Load card data exclusively from CSV file.
-    
+    """Load card data exclusively from CSV file (English-only schema).
+
     Args:
         csv_path: Path to CSV file
         include_all: If True, include all cards regardless of InDeck status
@@ -45,13 +45,13 @@ def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List
                         return row[col]
                 return default
             
-            # Determine if the card should be in the deck
+            # Determine if the card should be in the deck (English markers only)
             # Support multiple column names and ✓/✗ markers
             indeck_raw = (_get_column_value('in_deck') or '').strip()
             indeck_l = indeck_raw.lower()
-            if indeck_raw in {'✓', '✔', '+'} or indeck_l in {'yes', 'true', '1', 'y', 'да'}:
+            if indeck_raw in {'✓', '✔', '+'} or indeck_l in {'yes', 'true', '1', 'y'}:
                 in_deck = True
-            elif indeck_raw in {'✗', 'x', '-'} or indeck_l in {'no', 'false', '0', 'n', 'нет'}:
+            elif indeck_raw in {'✗', 'x', '-'} or indeck_l in {'no', 'false', '0', 'n'}:
                 in_deck = False
             else:
                 # Default to including the card if unclear
@@ -65,8 +65,8 @@ def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List
                 'name': _get_column_value('name') or f"Card {len(cards)}",
                 'type': (_get_column_value('type') or 'common').lower(),
                 'faction': (_get_column_value('faction') or 'neutral').lower(),
-                # Terminology: prefer 'clan/Клан', fallback to legacy 'caste/Каста'
-                'caste': (_get_column_value('clan') or _get_column_value('caste') or '').strip() or None,
+                # Terminology: primary 'clan'; fallback to legacy English 'caste'
+                'clan': (_get_column_value('clan') or _get_column_value('caste') or '').strip() or None,
                 'hp': _to_int(_get_column_value('hp', 1), 1),
                 'atk': _to_int(_get_column_value('atk', 0), 0),
                 'd': _to_int(_get_column_value('defend', 0), 0),
@@ -79,6 +79,9 @@ def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List
                 'pair_d': _to_int(_get_column_value('pair_d', 0), 0),
                 'pair_r': _to_int(_get_column_value('pair_r', 0), 0),
             }
+            # Mirror to legacy field for compatibility during transition
+            if card_data.get('clan'):
+                card_data['caste'] = card_data['clan']
             
             # Parse ABL if present
             abl_text = (_get_column_value('abl') or '').strip()

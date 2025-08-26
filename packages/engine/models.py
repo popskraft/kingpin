@@ -9,19 +9,19 @@ class CardType(str, Enum):
     unique = "unique"
     common = "common"
     event = "event"
-    action = "action"  # мгновенные действия/события
-    token = "token"  # двусторонние жетоны
+    action = "action"  # instant actions/events
+    token = "token"  # double-sided tokens
 
 
 class Faction(str, Enum):
     neutral = "neutral"
-    # Добавляйте фракции в конфиге и мапьте к строкам
+    # Add factions in config and map to strings
 
 
 class PaidAbility(BaseModel):
     id: str
     cost: int = 1
-    cooldown_per_turn: int = 1  # по умолчанию 1 раз в ход
+    cooldown_per_turn: int = 1  # default: once per turn
     effect_id: str
 
 
@@ -30,49 +30,58 @@ class Card(BaseModel):
     name: str
     type: CardType = CardType.common
     faction: Faction | str = Faction.neutral
+    # Primary terminology
+    clan: Optional[str] = None
+    # Deprecated legacy field kept for backward compatibility
     caste: Optional[str] = None
     hp: int = 1
     atk: int = 0
-    d: int = 0  # темп найма Братков
-    price: int = 0  # цена карты
-    corruption: int = 0  # коррупция
-    rage: int = 0  # ярость
-    # Способность: числовое значение или словарь трейтов (в т.ч. вложенные). Допускаем строковые значения
-    # для спец-маркеров вроде "all": {"anti_corruption": "all"}
+    d: int = 0  # base defend (shield limit)
+    price: int = 0  # card price
+    corruption: int = 0  # corruption cost (bribe)
+    rage: int = 0  # rage aura
+    # Ability: numeric value or dict of traits (incl. nested). String values allowed
+    # for special markers like "all": {"anti_corruption": "all"}
     abl: int | Dict[str, int | str | dict] = 0
-    # DEPRECATED: старое имя поля; поддерживаем для обратной совместимости и мигрируем в abl
+    # DEPRECATED: legacy field name; supported for backward compatibility and migrated to abl
     inf: Optional[int | Dict[str, int]] = None
     paid: List[PaidAbility] = Field(default_factory=list)
-    # Доп. поля для гибкости (DEPRECATED: переносим ключи в inf-словарь)
+    # Extra fields for flexibility (DEPRECATED: move keys into abl dict)
     meta: Dict[str, int | str | bool] = Field(default_factory=dict)
-    # Короткое текстовое описание для игрока (отображение на карте/в UI)
+    # Short player-facing description (for card/UI display)
     notes: str = ""
-    # Полевые бонусы синергии парами (2+ карты одной касты/фракции). Применяются ПО-КАРТОЧНО
-    # при активной парной синергии на стороне. Эти поля опциональны и по умолчанию равны 0.
+    # Per-card bonuses when pair synergy is active on the side. Optional, default 0.
     pair_hp: int = 0
     pair_d: int = 0
     pair_r: int = 0
 
     @root_validator(pre=True)
     def _migrate_inf_to_abl(cls, values):  # type: ignore[override]
-        # Если abl не задан, а инфо пришло в старом поле inf — перенесём
+        # If abl is missing but legacy inf present — migrate it
         if "abl" not in values and "inf" in values:
             values["abl"] = values.get("inf")
-        # Нормализация опечатки фракции в старых данных: goverment -> government
+        # Normalize typo for old faction value: goverment -> government
         fac = values.get("faction")
         if isinstance(fac, str) and fac == "goverment":
             values["faction"] = "government"
+        # Populate legacy 'caste' from 'clan' if only clan provided (and vice versa) for compatibility
+        clan = values.get("clan")
+        caste = values.get("caste")
+        if clan and not caste:
+            values["caste"] = clan
+        if caste and not clan:
+            values["clan"] = caste
         return values
 
 
 class Slot(BaseModel):
     card: Optional[Card] = None
     face_up: bool = True
-    muscles: int = 0  # Братки на карте
+    muscles: int = 0  # shields on the card
 
 
 class TokenPools(BaseModel):
-    reserve_money: int = 12  # стартовое количество по умолчанию
+    reserve_money: int = 12  # default starting amount
     otboy: int = 0
 
 

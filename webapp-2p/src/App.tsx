@@ -9,23 +9,23 @@ function getCardEmoji(card: Card): string {
   const text = `${card.name} ${(card.type || '')} ${(card.notes || '')}`.toLowerCase()
   const has = (s: string) => text.includes(s)
   // Role/name based
-  if (has('boss') || has('king') || has('queen') || has('leader') || has('chief') || has('босс') || has('король') || has('королева') || has('лидер') || has('вож') ) return '👑'
-  if (has('assassin') || has('killer') || has('rogue') || has('ninja') || has('убий') || has('килл') || has('разбой') || has('ниндзя')) return '🗡️'
-  if (has('sniper') || has('shooter') || has('gunner') || has('hitman') || has('снайпер') || has('стрел')) return '🎯'
-  if (has('tank') || has('guard') || has('bodyguard') || has('shield') || has('танк') || has('гвард') || has('охран') || has('щит')) return '🛡️'
-  if (has('doctor') || has('medic') || has('healer') || has('nurse') || has('врач') || has('медик') || has('лекар')) return '🩺'
-  if (has('engineer') || has('mechanic') || has('tech') || has('инжен') || has('механ')) return '🛠️'
-  if (has('hacker') || has('cyber') || has('хакер') || has('кибер')) return '💻'
-  if (has('mage') || has('wizard') || has('sorcer') || has('маг') || has('чарод') || has('колдун')) return '✨'
-  if (has('thief') || has('pickpocket') || has('smuggler') || has('spy') || has('scout') || has('вор') || has('шпион') || has('развед')) return '🕵️'
-  if (has('robot') || has('android') || has('mech') || has('робот') || has('андроид') || has('мех')) return '🤖'
-  if (has('zombie') || has('undead') || has('ghoul') || has('зомби') || has('нежить') || has('упыр')) return '🧟'
-  if (has('priest') || has('monk') || has('cleric') || has('свящ') || has('монах') || has('жрец')) return '🙏'
-  if (has('bard') || has('бард')) return '🎵'
-  if (has('fire') || has('flame') || has('pyro') || has('огонь') || has('плам')) return '🔥'
-  if (has('ice') || has('frost') || has('лед') || has('мороз')) return '❄️'
-  if (has('poison') || has('toxic') || has('venom') || has('яд') || has('токс')) return '☠️'
-  if (has('wolf') || has('tiger') || has('bear') || has('beast') || has('волк') || has('тигр') || has('медвед') || has('звер')) return '🐾'
+  if (has('boss') || has('king') || has('queen') || has('leader') || has('chief')) return '👑'
+  if (has('assassin') || has('killer') || has('rogue') || has('ninja')) return '🗡️'
+  if (has('sniper') || has('shooter') || has('gunner') || has('hitman')) return '🎯'
+  if (has('tank') || has('guard') || has('bodyguard') || has('shield')) return '🛡️'
+  if (has('doctor') || has('medic') || has('healer') || has('nurse')) return '🩺'
+  if (has('engineer') || has('mechanic') || has('tech')) return '🛠️'
+  if (has('hacker') || has('cyber')) return '💻'
+  if (has('mage') || has('wizard') || has('sorcer')) return '✨'
+  if (has('thief') || has('pickpocket') || has('smuggler') || has('spy') || has('scout')) return '🕵️'
+  if (has('robot') || has('android') || has('mech')) return '🤖'
+  if (has('zombie') || has('undead') || has('ghoul')) return '🧟'
+  if (has('priest') || has('monk') || has('cleric')) return '🙏'
+  if (has('bard')) return '🎵'
+  if (has('fire') || has('flame') || has('pyro')) return '🔥'
+  if (has('ice') || has('frost')) return '❄️'
+  if (has('poison') || has('toxic') || has('venom')) return '☠️'
+  if (has('wolf') || has('tiger') || has('bear') || has('beast')) return '🐾'
   // Stat-based fallback
   if ((card.atk || 0) >= 5) return '⚔️'
   if ((card.hp || 0) >= 5) return '🛡️'
@@ -42,11 +42,11 @@ function getClanIcon(clan?: string): string | null {
 }
 
 function getClanStripeClass(card: Card): string {
-  // Определяем цвет полоски по клану (приоритет) или фракции
+  // Determine stripe color by clan (priority) or faction
   const clanRaw = (((card.clan) || (card as any)?.caste || '') as string).toLowerCase()
   const factionRaw = (card.faction || '').toLowerCase()
   
-  // Кланы имеют приоритет над фракциями
+  // Clans have priority over factions
   if (clanRaw === 'gangsters') return 'gangsters'
   if (clanRaw === 'authorities') return 'authorities'
   if (clanRaw === 'loners') return 'loners'
@@ -75,11 +75,11 @@ function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo 
   const defDisp = (card.d ?? 0) + (bonusD || 0)
   const rageDisp = (card.rage ?? 0) + (bonusR || 0)
   const hasActivePair = !!(pairInfo && ((pairInfo.hp ?? 0) !== 0 || (pairInfo.d ?? 0) !== 0 || (pairInfo.r ?? 0) !== 0))
-  // Клан - основная группировка для синергии
+  // Clan — main grouping for synergy
   const clanRaw = (card.clan || '').toLowerCase()
   const factionRaw = (card.faction || '').toLowerCase()
   
-  // Определяем цвет полоски по клану (приоритет) или фракции
+  // Determine stripe color by clan (priority) or faction
   const stripeClan = clanRaw === 'gangsters' ? 'gangsters'
     : clanRaw === 'authorities' ? 'authorities'
     : clanRaw === 'loners' ? 'loners'
@@ -90,13 +90,13 @@ function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo 
     : factionRaw.includes('slippery') ? 'slippery'
     : factionRaw ? 'faction'
     : ''
-  // Полоска клана/фракции (всегда показывается)
+  // Clan/faction stripe (always shown)
   const clanStripeClass = getClanStripeClass(card)
   
   return (
     <div className="card">
-      {clanStripeClass ? <div className={`clan-stripe ${clanStripeClass}`} title={`Клан/Фракция: ${clanStripeClass}`} /> : null}
-      {hasActivePair && stripeClan ? <div className={`synergy-stripe ${stripeClan}`} title={`Синергия пары: ${stripeClan}`} /> : null}
+      {clanStripeClass ? <div className={`clan-stripe ${clanStripeClass}`} title={`Clan/Faction: ${clanStripeClass}`} /> : null}
+      {hasActivePair && stripeClan ? <div className={`synergy-stripe ${stripeClan}`} title={`Pair synergy: ${stripeClan}`} /> : null}
       <div className="card-title">
         {(((card.clan) || (card as any)?.caste) ? (
           <span className="clan-icon" title={`Clan: ${((card.clan) || (card as any)?.caste)}`}>
@@ -389,10 +389,10 @@ export default function App(): JSX.Element {
   const parseGivesGlobalAtk = (card: Card | null | undefined): number => {
     if (!card) return 0
     const type = (card.type || '').toLowerCase()
-    if (type === 'boss') return 1 // Boss Rage: +1 ATK всем
+    if (type === 'boss') return 1 // Boss Rage: +1 ATK to all
     const txt = `${card.name} ${(card.notes || '')}`.toLowerCase()
-    if (/\+\s*1\s*atk.*(всем|all)/i.test(txt)) return 1
-    if (/получают\s*\+\s*1\s*atk/i.test(txt)) return 1
+    if (/\+\s*1\s*atk.*(all)/i.test(txt)) return 1
+    if (/(gain|gives|give|grant|grants)\s*\+\s*1\s*atk/i.test(txt)) return 1
     const m = (card.notes || '').match(/rage\s*:\s*([1-9]\d*)/i)
     if (m) return parseInt(m[1], 10)
     return 0
@@ -574,6 +574,7 @@ export default function App(): JSX.Element {
   const emitPropose = () => socket?.emit('attack_propose', { room: ROOM })
   const emitAccept = () => socket?.emit('attack_accept', { room: ROOM })
   const emitCancel = () => socket?.emit('attack_cancel', { room: ROOM })
+  const emitApprove = emitAccept
 
   const visibleYou = view?.meta?.visible_slots?.you ?? 6
 
@@ -797,20 +798,20 @@ export default function App(): JSX.Element {
                 <div className="money" id="opp_money">💰 {opp?.tokens?.reserve_money ?? 0}</div>
               </div>
               {(oppClanSynergy || oppFactionSingle) && (
-                <div className={`opp-synergy ${(() => { const k = detectClanSynergyKey(opp?.board); return k ? 'clan-' + k : '' })()}`} id="opp_synergy">
-                  <div className="synergy-title">Synergy</div>
-                  <div className="synergy-row">
-                    <span className="synergy-label">Клан:</span>{' '}
-                    {oppClanSynergy ? (<><b>{oppClanSynergy.name}</b> → {oppClanSynergy.effect}</>) : '—'}
-                  </div>
-                  {oppFactionSingle && (
-                    <div className="synergy-row">
-                      <span className="synergy-label">Фракция:</span>{' '}
-                      <b>{oppFactionSingle}</b> → каскады отключены в этой версии
-                    </div>
-                  )}
+            <div className={`opp-synergy ${(() => { const k = detectClanSynergyKey(opp?.board); return k ? 'clan-' + k : '' })()}`} id="opp_synergy">
+              <div className="synergy-title">Synergy</div>
+              <div className="synergy-row">
+                <span className="synergy-label">Clan:</span>{' '}
+                {oppClanSynergy ? (<><b>{oppClanSynergy.name}</b> → {oppClanSynergy.effect}</>) : '—'}
+              </div>
+              {oppFactionSingle && (
+                <div className="synergy-row">
+                  <span className="synergy-label">Faction:</span>{' '}
+                  <b>{oppFactionSingle}</b> → cascades are disabled in this version
                 </div>
               )}
+            </div>
+          )}
             </div>
           </section>
 
@@ -890,13 +891,13 @@ export default function App(): JSX.Element {
                 <div className={`your-synergy ${(() => { const k = detectClanSynergyKey(you?.board); return k ? 'clan-' + k : '' })()}`} id="your_synergy">
                   <div className="synergy-title">Synergy</div>
                   <div className="synergy-row">
-                    <span className="synergy-label">Клан:</span>{' '}
+                    <span className="synergy-label">Clan:</span>{' '}
                     {yourClanSynergy ? (<><b>{yourClanSynergy.name}</b> → {yourClanSynergy.effect}</>) : '—'}
                   </div>
                   {yourFactionSingle && (
                     <div className="synergy-row">
-                      <span className="synergy-label">Фракция:</span>{' '}
-                      <b>{yourFactionSingle}</b> → каскады отключены в этой версии
+                      <span className="synergy-label">Faction:</span>{' '}
+                      <b>{yourFactionSingle}</b> → cascades are disabled in this version
                     </div>
                   )}
                 </div>
@@ -996,9 +997,9 @@ export default function App(): JSX.Element {
               </div>
             </div>
             <div className="preview-props">
-              <div className="prop"><b>Тип:</b> {preview.card.type || '—'}</div>
-              <div className="prop"><b>Фракция:</b> {preview.card.faction || '—'}</div>
-              <div className="prop"><b>Клан:</b> {(preview.card.clan || (preview.card as any)?.caste) || '—'}</div>
+              <div className="prop"><b>Type:</b> {preview.card.type || '—'}</div>
+              <div className="prop"><b>Faction:</b> {preview.card.faction || '—'}</div>
+              <div className="prop"><b>Clan:</b> {(preview.card.clan || (preview.card as any)?.caste) || '—'}</div>
               {(() => {
                 const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined
                 const pair = synergyBonusesForCardPair(b, preview.card)
@@ -1017,7 +1018,7 @@ export default function App(): JSX.Element {
               })()}
               {(preview.card.price ?? 0) > 0 && <div className="prop"><b>Price:</b> {preview.card.price}</div>}
               {(preview.card.corruption ?? 0) > 0 && <div className="prop"><b>Corruption:</b> {preview.card.corruption}</div>}
-              {preview.card.notes && <div className="prop"><b>Примечания:</b> {preview.card.notes}</div>}
+              {preview.card.notes && <div className="prop"><b>Notes:</b> {preview.card.notes}</div>}
             </div>
           </div>
         </div>
@@ -1028,8 +1029,8 @@ export default function App(): JSX.Element {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal attack-modal">
             <div className="modal-header">
-              <div className="modal-title">Планирование атаки</div>
-              <div className="modal-sub">Атакующие: {selectedAttackers.map(i => `#${i + 1}`).join(', ')} → Цель: слот {localAttackModal.targetSlot + 1}</div>
+              <div className="modal-title">Attack Planning</div>
+              <div className="modal-sub">Attackers: {selectedAttackers.map(i => `#${i + 1}`).join(', ')} → Target: slot {localAttackModal.targetSlot + 1}</div>
             </div>
             <div className="modal-content">
               {/* Target card with exact replica */}
@@ -1060,7 +1061,7 @@ export default function App(): JSX.Element {
                           cursor: filled ? 'pointer' : 'default'
                         }}
                         onClick={filled ? () => toggleShieldMark(i) : undefined}
-                        title={filled ? (marked ? 'Отменить удаление щита' : 'Отметить щит для удаления') : ''}
+                        title={filled ? (marked ? 'Unmark shield removal' : 'Mark shield for removal') : ''}
                       />
                     )
                   })}
@@ -1069,7 +1070,7 @@ export default function App(): JSX.Element {
 
               {/* Attack summary */}
               <div className="attackers">
-                <div className="label">Атакующие карты</div>
+                <div className="label">Attacking cards</div>
                 <div className="list">
                   {selectedAttackers.map(i => {
                     const card = you?.board?.[i]?.card
@@ -1090,8 +1091,10 @@ export default function App(): JSX.Element {
                     return s + (c ? synergyBonusesForCardPair(you?.board, c).r : 0)
                   }, 0)
                   const buffSum = (perCardBaseR > 0 ? selectedAttackers.length * perCardBaseR : 0) + perCardPairRSum
-                  // Shields no longer contribute to attack
-                  const totalAtk = baseSum + buffSum
+                  // Shields on attackers add +0.25 ATK each (decimal totals kept)
+                  const shieldAtkCount = selectedAttackers.reduce((s, i) => s + (you?.board?.[i]?.muscles ?? 0), 0)
+                  const shieldAtk = shieldAtkCount * 0.25
+                  const totalAtk = baseSum + buffSum + shieldAtk
                   // Defender HP = base HP + shields (no D, no synergy)
                   const tSlot = localAttackModal.targetSlot
                   const defSlot = opp?.board?.[tSlot]
@@ -1101,8 +1104,8 @@ export default function App(): JSX.Element {
                   const totalHP = baseHP + shields
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${selectedAttackers.length}×${perCardBaseR}` : ''}{perCardPairRSum > 0 ? ` + pairR:${perCardPairRSum}` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели:</b> {`${baseHP}`}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Total attack:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${selectedAttackers.length}×${perCardBaseR}` : ''}{perCardPairRSum > 0 ? ` + pairR:${perCardPairRSum}` : ''}{shieldAtkCount > 0 ? ` + ${shieldAtkCount}×0.25` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Target defense:</b> {`${baseHP}`}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
@@ -1112,9 +1115,9 @@ export default function App(): JSX.Element {
               <div className="modal-controls">
                 <div className="control-row">
                   <div className="info">
-                    {localAttackModal.markedShields.length > 0 && `Щиты к удалению: ${localAttackModal.markedShields.length}`}
-                    {localAttackModal.cardMarkedForDestroy && ' • Карта отмечена для уничтожения'}
-                    {localAttackModal.markedShields.length === 0 && !localAttackModal.cardMarkedForDestroy && 'Выберите щиты для удаления или отметьте карту для уничтожения'}
+                    {localAttackModal.markedShields.length > 0 && `Shields to remove: ${localAttackModal.markedShields.length}`}
+                    {localAttackModal.cardMarkedForDestroy && ' • Card marked for destruction'}
+                    {localAttackModal.markedShields.length === 0 && !localAttackModal.cardMarkedForDestroy && 'Select shields to remove or mark the card for destruction'}
                   </div>
                 </div>
                 
@@ -1123,7 +1126,7 @@ export default function App(): JSX.Element {
                     className={`toggle ${localAttackModal.cardMarkedForDestroy ? 'on' : ''}`} 
                     onClick={toggleCardDestroy}
                   >
-                    {localAttackModal.cardMarkedForDestroy ? '✓ Карта будет уничтожена' : 'Уничтожить карту'}
+                    {localAttackModal.cardMarkedForDestroy ? '✓ Card will be destroyed' : 'Destroy card'}
                   </button>
                 </div>
 
@@ -1133,10 +1136,10 @@ export default function App(): JSX.Element {
                     disabled={localAttackModal.markedShields.length === 0 && !localAttackModal.cardMarkedForDestroy}
                     className="primary"
                   >
-                    Отправить предложение
+                    Send proposal
                   </button>
                   <button onClick={cancelLocalAttack} className="danger">
-                    Отменить
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -1150,8 +1153,8 @@ export default function App(): JSX.Element {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal attack-modal">
             <div className="modal-header">
-              <div className="modal-title">Подтверждение атаки</div>
-              <div className="modal-sub">Атакующий: {attack.attacker} → Цель: {attack.target.pid} слот {attack.target.slot + 1}</div>
+              <div className="modal-title">Attack Confirmation</div>
+              <div className="modal-sub">Attacker: {attack.attacker} → Target: {attack.target.pid} slot {attack.target.slot + 1}</div>
             </div>
             <div className="modal-content">
               {/* Target preview */}
@@ -1195,11 +1198,11 @@ export default function App(): JSX.Element {
 
               {/* Attackers list */}
               <div className="attackers">
-                <div className="label">Атакующие</div>
+                <div className="label">Attackers</div>
                 <div className="list">{attack.attackerSlots.map(i => `#${i + 1}`).join(', ')}</div>
               </div>
 
-              {/* Calculations: total ATK and defender HP (visible обеим сторонам) */}
+              {/* Calculations: total ATK and defender HP (visible to both sides) */}
               <div className="calc-block">
                 {(() => {
                   const atkIsYou = attack.attacker === you?.id
@@ -1231,8 +1234,8 @@ export default function App(): JSX.Element {
 
                   return (
                     <>
-                      <div className="calc-row"><b>Суммарная атака:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${attack.attackerSlots.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${attack.attackerSlots.length}×${perCardSynergyR}` : ''}{shieldAtkCount > 0 ? ` + ${shieldAtkCount}×0.25` : ''} = <b>{totalAtk}</b></div>
-                      <div className="calc-row"><b>Защита цели:</b> {`${baseHP}`}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
+                      <div className="calc-row"><b>Total attack:</b> {atkCards.map(c => c.atk ?? 0).join(' + ')}{perCardBaseR > 0 ? ` + ${attack.attackerSlots.length}×${perCardBaseR}` : ''}{perCardSynergyR > 0 ? ` + ${attack.attackerSlots.length}×${perCardSynergyR}` : ''}{shieldAtkCount > 0 ? ` + ${shieldAtkCount}×0.25` : ''} = <b>{totalAtk}</b></div>
+                      <div className="calc-row"><b>Target defense:</b> {`${baseHP}`}{shields > 0 ? ` + ${Array.from({length: shields}).map(() => '1').join(' + ')}` : ''} = <b>{totalHP}</b></div>
                     </>
                   )
                 })()}
@@ -1244,26 +1247,26 @@ export default function App(): JSX.Element {
                   <>
                     <div className="control-row">
                       <div className="info">
-                        {attack.status === 'planning' ? 'Ожидание предложения от атакующего...' : 
-                         attack.plan.destroyCard ? 'Атакующий предлагает уничтожить эту карту.' : 
-                         `Атакующий предлагает удалить ${attack.plan.removeShields} щит(ов).`}
+                        {attack.status === 'planning' ? 'Waiting for the attacker\'s proposal...' : 
+                         attack.plan.destroyCard ? 'The attacker proposes to destroy this card.' : 
+                         `The attacker proposes to remove ${attack.plan.removeShields} shield(s).`}
                       </div>
                     </div>
                     <div className="control-row">
                       <button 
-                        onClick={emitAccept} 
+                        onClick={emitApprove}
                         disabled={attack.status !== 'proposed'}
                         className="primary"
                       >
-                        {attack.plan.destroyCard ? 'Согласен на уничтожение' : 'Согласен'}
+                        {attack.plan.destroyCard ? 'Agree to destruction' : 'Agree'}
                       </button>
-                      <button onClick={emitCancel} className="danger">Отменить</button>
+                      <button onClick={emitCancel} className="danger">Cancel</button>
                     </div>
                   </>
                 ) : (
                   <div className="control-row">
-                    <div className="info">Ожидание ответа от защищающегося...</div>
-                    <button onClick={emitCancel} className="danger">Отменить</button>
+                    <div className="info">Waiting for defender's response...</div>
+                    <button onClick={emitCancel} className="danger">Cancel</button>
                   </div>
                 )}
               </div>
@@ -1277,17 +1280,17 @@ export default function App(): JSX.Element {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal attack-modal turn-modal">
             <div className="modal-header">
-              <div className="modal-title">Нет доступных ходов?</div>
-              <div className="modal-sub">Похоже, у вас закончились возможные действия.</div>
+              <div className="modal-title">No moves available?</div>
+              <div className="modal-sub">It seems you have no actions left.</div>
             </div>
             <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div className="calc-block">
-                <div className="calc-row">Вы можете закончить ход или продолжить, если хотите перепроверить.</div>
+                <div className="calc-row">You can end your turn or continue if you want to double-check.</div>
               </div>
               <div className="modal-controls">
                 <div className="control-row">
-                  <button className="primary" onClick={() => { setTurnAlert(false); endTurn() }}>Закончить ход</button>
-                  <button onClick={dismissTurnAlert}>Продолжить</button>
+                  <button className="primary" onClick={() => { setTurnAlert(false); endTurn() }}>End turn</button>
+                  <button onClick={dismissTurnAlert}>Continue</button>
                 </div>
               </div>
             </div>

@@ -1,6 +1,6 @@
 # Kingpin - Game Rules
 
-Strategic card game for 2-3 players with economics, tactical combat, and caste system elements.
+Strategic card game for 2-3 players with economics, tactical combat, and clan/faction synergy elements.
 
 ## Overview
 
@@ -8,10 +8,10 @@ Strategic card game for 2-3 players with economics, tactical combat, and caste s
 Destroy opponent's Boss by reducing its HP to 0 or below.
 
 ### Core Principles
-- **Castes and factions**: dual synergy system
+- **Clans and factions**: dual synergy system
 - **Card bribery**: buying opponent's cards for money
 - **Resource management**: 💰/🛡️ tokens and their redistribution
-- **Golden Fund**: shared money resource pool (total 40 tokens: 36 base [12 × 3 castes] + 4 additional)
+- **Golden Fund**: shared money resource pool (total 40 tokens: 36 base [12 × 3 clans] + 4 additional)
 
 ---
 
@@ -28,18 +28,18 @@ Destroy opponent's Boss by reducing its HP to 0 or below.
 - **Reserve Pile**: shared open zone for returned and rejected cards. Initially empty.
 - **Player Safe**: money storage (💰 face up)
 - **Bank**: shared zone for discarded money tokens
-- **Golden Fund**: shared money resource pool (total 40 tokens: 36 base [12 × 3 castes] + 4 additional)
+- **Golden Fund**: shared money resource pool (total 40 tokens: 36 base [12 × 3 clans] + 4 additional)
 - **Discard Pile**: permanent card removal zone
 
-### 1.2 Tokens (Total 40 tokens: 36 base [12 × 3 castes] + 4 additional)
+### 1.2 Tokens (Total 40 tokens: 36 base [12 × 3 clans] + 4 additional)
 **Double-sided tokens 💰 ↔ 🛡️**:
 - **Money (💰)**: resource for purchases and enhancements
 - **Shield (🛡️)**: defensive units (HP=1, ATK=0.25). When the host card participates in an attack, each shield on it contributes +0.25 to that attack's total. Corruption cost to bribe: 3 (gangsters, loners), 2 (authorities)
 
 ### 1.3 Deck Structure
-- **18 caste cards**: 6 cards × 3 castes (gangsters, authorities, loners)
+- **18 clan cards**: 6 cards × 3 clans (gangsters, authorities, loners)
 - **6 solo cards**: neutral cards with special abilities
-- **3 unique cards**: 1 per caste (maximum 1 per player)
+- **3 unique cards**: 1 per clan (maximum 1 per player)
 - **10 events/actions**: instant effects
 - **3 Boss cards**: not in deck, selected at game start
 
@@ -57,8 +57,8 @@ Total: 37 cards in deck (+ 3 Bosses outside deck).
 - **Corruption**: bribery cost = Corruption (spent from safe)
 - **HP**: health points (card destroyed when HP ≤ 0)
 - **Attack**: damage when attacking
-- **Caste**: caste (gangsters, authorities, loners) - intra-caste synergies
-- **Faction**: faction (heads, specialists, stormers, slippery) - cross-caste synergies
+- **Clan**: clan (gangsters, authorities, loners) - intra-clan synergies
+- **Faction**: faction (heads, specialists, stormers, slippery) - cross-clan synergies
 - **Defend (D)**: base shield limit (🛡️) for this card. Effective shield limit = `min(4, D + Authority_auras)`.
 - **Rage**: per-card attack aura. Adds +R ATK to every attacking card you control (i.e., a combined attack of N cards gets +N×R). Stacks across multiple sources.
 - **Authority**: aura increasing shield limit of all your cards by +N while source is in play
@@ -88,9 +88,9 @@ Note: At game start, Reserve Pile is empty (0 cards). The entire shared deck (ex
 
 ### 2.2 Starting Bosses
 Source of truth: `config/cards.csv` file. Current values:
-- **Gangster Boss**: HP=10, ATK=2, Corruption=12, Defend=3, Rage=1, Authority=1; Caste=gangsters, Faction=heads
-- **Authority Boss**: HP=10, ATK=2, Corruption=12, Defend=3, Rage=1, Authority=1; Caste=authorities, Faction=heads
-- **Loner Boss**: HP=10, ATK=2, Corruption=12, Defend=3, Rage=1, Authority=1; Caste=loners, Faction=heads
+- **Gangster Boss**: HP=10, ATK=2, Corruption=12, Defend=3, Rage=1, Authority=1; Clan=gangsters, Faction=heads
+- **Authority Boss**: HP=10, ATK=2, Corruption=12, Defend=3, Rage=1, Authority=1; Clan=authorities, Faction=heads
+- **Loner Boss**: HP=10, ATK=2, Corruption=12, Defend=3, Rage=1, Authority=1; Clan=loners, Faction=heads
 
 ---
 
@@ -141,10 +141,10 @@ Turn passes to next player clockwise
 
 ## 4. Synergy Systems
 
-### 4.1 Caste Synergies (When only cards of one common caste are on board)
-- **Gangsters**: +1 R Enhanced aggression.
-- **Authorities**: +1 HP Enhanced health.
-- **Loners**: +1 D Enhanced defense.
+### 4.1 Clan Synergies (active when all cards on your board share the same clan)
+- **Gangsters**: +1 R and +1 D (enhanced aggression and defense)
+- **Authorities**: +1 HP and +1 D (enhanced durability and defense)
+- **Loners**: +1 R and +1 HP (enhanced aggression and durability)
 
 ### 4.2 Faction Synergies
 - **Heads**: Leadership abilities
@@ -171,11 +171,13 @@ Note: faction cascades are disabled in this version and will be added later.
 ## 6. Combat Rules
 
 ### 6.1 Damage Calculation
-**Total damage (combined attack)** = sum of attackers' ATK + (Rage per card × number of attackers) + (0.25 × total shields on the attacking cards) + ammunition (💰, if any)
+**Total damage (combined attack)** = sum of attackers' ATK + (Rage per attacking card × number of attacking cards) + (0.25 × total shields on the attacking cards participating in the attack) + ammunition (💰, if any)
 
-Notes:
-- Rage applies per attacking card. Example: with R=1 and 2 attackers → +2 total.
-- Shield tokens contribute +0.25 each only when their host card participates in the attack.
+- Notes:
+  - Rage applies per attacking card. Example: with R=1 and 2 attackers → +2 total.
+  - Shield tokens contribute +0.25 each only when their host card participates in the attack.
+  - Damage totals can be fractional (no rounding in preview or resolution).
+  - Defense equals target HP + actual shields only; no global defense bonus.
 - **Damage absorption**: first 🛡️ (1 HP per token), then card HP.
 - **Destruction**: when HP ≤ 0 card goes to Discard Pile.
 
@@ -265,8 +267,8 @@ Notes:
 
 ### 10.1 Game Balance
 - Total cards: 40 (37 in deck + 3 Bosses outside deck). Total tokens: 40.
-- Each caste has exactly 8 cards (including Boss) for equal balance
-- Factions create cross-caste synergies
+- Each clan has exactly 8 cards (including Boss) for equal balance
+- Factions create cross-clan synergies
 - Solo cards provide additional variability
 - Golden Fund compensates for missing third player
 

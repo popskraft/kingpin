@@ -39,10 +39,10 @@ def _maybe_trigger_cascade(ctx: Ctx, pid: str) -> None:
     if not st.config.cascade_enabled:
         return
     p = st.get_player(pid)
-    # Ограничение по количеству срабатываний
+    # Limit the number of triggers
     if p.cascade_triggers >= st.config.cascade_max_triggers:
         return
-    # Подсчёт по фракциям: нужны 2-2-2 по трём основным
+    # Count by factions: need 2-2-2 across three main factions
     counts: Dict[str, int] = {"gangsters": 0, "government": 0, "mercenaries": 0}
     for s in p.slots:
         if s.card and s.card.type != "event":
@@ -152,10 +152,10 @@ def _on_enter_slot(ctx: Ctx, owner_pid: str, slot_index: int) -> None:
 def _apply_damage(slot: Slot, damage: int, ctx: Ctx, owner_pid: str):
     if damage <= 0 or slot.card is None:
         return
-    # сначала сгорают Братки
+    # Muscles burn first (block damage first)
     burn = min(slot.muscles, damage)
     slot.muscles -= burn
-    # Братки и деньги всегда уходят в Отбой владельца защищающейся карты
+    # Muscles and spent ammo always go to the discard (otboy) of the defending card's owner
     ctx.state.players[owner_pid].tokens.otboy += burn
     remain = damage - burn
     if remain > 0:
@@ -163,24 +163,24 @@ def _apply_damage(slot: Slot, damage: int, ctx: Ctx, owner_pid: str):
 
 
 def _economic_collapse_check(p: PlayerState) -> bool:
-    # 0 денег и 0 братков на столе
+    # 0 money and 0 muscles on the board
     total_muscles = sum(s.muscles for s in p.slots)
     return p.tokens.reserve_money == 0 and total_muscles == 0
 
 
 def resolve_event(ctx: Ctx, card) -> None:
-    """Простая резолюция событий (демо-реализация для карт из config)."""
+    """Simple event resolution (demo implementation for cards from config)."""
     st = ctx.state
     ap = st.get_player(st.active_player)
     op = st.get_player(st.opponent_id())
     if card.id == "event_plus_cash":
-        # Вернуть до 2 жетонов из Отбоя активного игрока в резерв
+        # Return up to 2 tokens from the active player's discard to reserve
         take = min(2, ap.tokens.otboy)
         ap.tokens.otboy -= take
         ap.tokens.reserve_money += take
         ctx.log.append({"type": "event_plus_cash", "moved": take})
     elif card.id == "event_minus_raid":
-        # Снять 1 Братка у первого слота оппонента, где он есть
+        # Remove 1 muscle from the first opponent slot that has any
         for i, s in enumerate(op.slots):
             if s.muscles > 0:
                 s.muscles -= 1
@@ -188,12 +188,12 @@ def resolve_event(ctx: Ctx, card) -> None:
                 ctx.log.append({"type": "event_minus_raid", "slot": i})
                 break
     else:
-        # Пока только лог
+        # Log only for now
         ctx.log.append({"type": "event_unknown", "id": card.id})
 
 
 def initialize_game(state: GameState):
-    # подготовка флагов хода
+    # Prepare turn flags
     state.phase = TurnPhase.upkeep
     state.turn_number = 1
     state.flags.update({
@@ -202,14 +202,14 @@ def initialize_game(state: GameState):
 
 
 def next_turn(ctx: Ctx):
-    # смена активного игрока и сброс одноходовых флагов
+    # Switch active player and reset per-turn flags
     ctx.state.active_player = ctx.state.opponent_id()
     ctx.state.turn_number += 1
     ctx.state.phase = TurnPhase.upkeep
     ctx.state.flags["micro_bribe_used"] = False
-    # Авто-открытие карт, лежащих лицом вниз на столе активного игрока
+    # Auto-reveal face-down cards on the active player's board
     ap = ctx.state.get_player(ctx.state.active_player)
-    # Сбросить каскадные флаги на новый ход
+    # Reset cascade flags for the new turn
     ap.cascade_used = False
     ap.cascade_triggers = 0
     for s in ap.slots:
@@ -223,7 +223,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
     op = st.get_player(st.opponent_id())
 
     if isinstance(action, Attack):
-        # расход боеприпасов
+        # Spend ammo
         ammo = max(0, min(st.config.ammo_max_bonus, action.ammo_spend))
         if ap.tokens.reserve_money < ammo:
             ammo = ap.tokens.reserve_money
@@ -231,30 +231,30 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
         ap.tokens.otboy += ammo
 
         dmg = action.base_damage if action.base_damage > 0 else 0
-        # если указан атакер, добавим его базовый урон
+        # If attacker is specified, add its base attack
         if action.attacker_slot is not None:
             slot_att = ap.slots[action.attacker_slot]
             if slot_att.card:
                 dmg += slot_att.card.atk
         dmg += ammo
 
-        # цель: приоритет — стол оппонента; если target_slot None и на столе пусто — допускаем цель из руки
+        # Target selection: prioritize opponent's board; if target_slot is None and board is empty, allow targeting from hand
         opponent_has_board = any(s.card is not None for s in op.slots)
         if action.target_slot is not None:
-            # Явно указан слот — атакуем карту на столе
+            # Explicit slot is given — attack the card on the board
             target_slot = op.slots[action.target_slot]
             _apply_damage(target_slot, dmg, ctx, owner_pid=op.id)
         else:
-            # Слот не указан
+            # No slot specified
             if opponent_has_board:
-                # Запрещено бить по руке, если на столе есть карты
+                # Cannot attack the hand if there are cards on the board
                 ctx.log.append({"type": "attack_skipped", "reason": "opponent_has_board"})
             else:
-                # Оппонент без карт на столе: можно целиться в карту из руки (если режим руки включён)
+                # Opponent has no cards on board: may target a card from hand (if hand mode enabled)
                 if st.config.hand_enabled and op.hand:
-                    # По умолчанию атакуем первую карту в руке
+                    # By default, attack the first card in hand
                     hand_card = op.hand[0]
-                    # Попытаться экстренно выложить карту в первый свободный слот и защитить её
+                    # Try to emergency-deploy the card to the first free slot and defend it
                     free_idx = None
                     for i, s in enumerate(op.slots):
                         if s.card is None:
@@ -264,24 +264,24 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
                         target_slot = op.slots[free_idx]
                         target_slot.card = hand_card
                         target_slot.face_up = True
-                        # Общий хук входа на стол (укладывает on-enter и каскад)
+                        # Generic enter-slot hook (applies on-enter and cascade)
                         _on_enter_slot(ctx, op.id, free_idx)
-                        # Убрать карту из руки (сыграли её вынужденно под удар)
+                        # Remove the card from hand (played it forcibly under attack)
                         op.hand.pop(0)
-                        # Квота экстренной защиты: не больше D + extra_defense + authority
+                        # Emergency defense quota: no more than D + extra_defense + authority
                         quota = _defense_quota(ctx, op.id, target_slot)
-                        # Сколько уже есть на слоте до усиления
+                        # How many muscles are already on the slot before reinforcement
                         already = target_slot.muscles
                         remaining_quota = max(0, quota - already)
 
-                        # Немедленная защита: найм, но не превышая remaining_quota
+                        # Immediate defense: hire, but not exceeding remaining_quota
                         if remaining_quota > 0 and op.tokens.reserve_money > 0:
                             can_hire = min(op.tokens.reserve_money, remaining_quota)
                             if can_hire > 0:
                                 op.tokens.reserve_money -= can_hire
                                 target_slot.muscles += can_hire
                                 remaining_quota -= can_hire
-                        # Перераспределение Братков с других слотов (бесплатно), но в рамках оставшейся квоты
+                        # Reassign muscles from other slots (free), within the remaining quota
                         need_block = max(0, dmg - target_slot.muscles)
                         if need_block > 0 and remaining_quota > 0:
                             for i, s in enumerate(op.slots):
@@ -296,11 +296,11 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
                                     need_block -= move
                                     remaining_quota -= move
                                     ctx.log.append({"type": "reassign_muscles", "from": i, "to": free_idx, "count": move})
-                        # Теперь применяем урон обычным способом с учётом братков
+                        # Now apply damage in the usual way, considering muscles
                         _apply_damage(target_slot, dmg, ctx, owner_pid=op.id)
                         ctx.log.append({"type": "attack_hand_deployed", "slot": free_idx, "dmg": dmg})
                     else:
-                        # Если нет свободного слота — урон прямо по HP карты в руке
+                        # If there is no free slot — damage directly to the HP of the card in hand
                         hand_card.hp -= max(0, dmg)
                         if hand_card.hp <= 0:
                             ctx.state.discard_out_of_game.append(hand_card)
@@ -328,7 +328,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
         st.phase = TurnPhase.resolution
 
     elif isinstance(action, Influence):
-        # микро-взятка
+        # Micro-bribe
         if action.micro_bribe_target_player and action.micro_bribe_target_slot is not None:
             if st.config.micro_bribe_once_per_turn and st.flags.get("micro_bribe_used", False):
                 return {"error": "micro_bribe_already_used"}
@@ -354,14 +354,14 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
         st.phase = TurnPhase.resolution
 
     elif isinstance(action, Draw):
-        # Добор как основное действие: варианты размещения — рука/слот вверх/полка вверх
-        # Лимит: если рука включена, добор разрешён, только если (рука+стол) < hand_limit
+        # Draw as a main action: placement options — hand / face-up slot / face-up shelf
+        # Limit: if hand is enabled, drawing is allowed only if (hand + board) < hand_limit
         if st.config.hand_enabled:
             combined = len(ap.hand) + len(ap.active_cards())
             if combined >= ap.hand_limit:
                 return {"error": "draw_limit_reached", "combined": combined, "limit": ap.hand_limit}
         if not st.deck:
-            # Если колода пуста, а на полке есть карты — перетасовать полку в новую закрытую колоду
+            # If the deck is empty but there are cards on the shelf — shuffle the shelf into a new face-down deck
             if st.shelf:
                 random.shuffle(st.shelf)
                 st.deck.extend(st.shelf)
@@ -370,7 +370,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             if not st.deck:
                 return {"error": "deck_empty"}
         card = st.deck.pop(0)
-        # Немедленная резолюция событий — слот/руку/полку не занимают
+        # Immediate resolution of event cards — they do not occupy a slot/hand/shelf
         if getattr(card, "type", None) == "event":
             resolve_event(ctx, card)
             ctx.log.append({"type": "draw_event", "card": card.id})
@@ -393,7 +393,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             slot.card = card
             slot.face_up = True
             placed = {"zone": "slot", "slot": action.slot_index}
-            # Общий хук входа на стол (укладывает on-enter и каскад)
+            # Generic enter-slot hook (applies on-enter and cascade)
             _on_enter_slot(ctx, ap.id, action.slot_index)
         elif action.place == "shelf":
             st.shelf.append(card)
@@ -403,8 +403,8 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
         ctx.log.append({"type": "draw", "card": card.id, "placed": placed})
         st.phase = TurnPhase.resolution
 
-    # Победа от убийства Босса
-    # По умолчанию — карта типа boss на столе оппонента
+    # Win by killing the Boss
+    # By default — a card of type "boss" on the opponent's board
     boss_dead = False
     for s in op.slots:
         if s.card and s.card.type == "boss" and s.card.hp <= 0:
@@ -414,7 +414,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
     result = {"phase": st.phase}
 
     if st.phase == TurnPhase.resolution:
-        # конец хода и проверка краха экономики у активного игрока
+        # End of turn and check for economic collapse of the active player
         st.phase = TurnPhase.end
         if _economic_collapse_check(ap):
             result["winner"] = st.opponent_id()
@@ -424,7 +424,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             result["winner"] = st.active_player
             result["win_reason"] = "boss_killed"
             return result
-        # переход хода
+        # Pass the turn
         next_turn(ctx)
         result["phase"] = st.phase
 
