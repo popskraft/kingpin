@@ -35,6 +35,18 @@ button.danger:hover { background: #3a1f1f; border-color: #7a3a3a; }
 .op-cursor::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin-left: -2px; margin-top: -2px; background: #fff; border-radius: 50%; opacity: .9; }
 .sidebar { position: relative; z-index: 2; background: var(--panel); border: 1px solid #2a3240; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 
+/* Desktop: make the right sidebar sticky so it stays visible while scrolling
+   and stops at the bottom of its parent container. */
+@media (min-width: 981px) {
+  .sidebar {
+    position: sticky;
+    top: 12px;            /* offset from the top while sticking */
+    align-self: start;    /* avoid stretching to full column height */
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;     /* scroll inside if content is taller than viewport */
+  }
+}
+
 .pile-box { background: var(--panel-2); border: 1px solid #2a3240; border-radius: 8px; padding: 10px; }
 .pile-title { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .pile-count { font-size: 24px; margin: 4px 0 8px; }

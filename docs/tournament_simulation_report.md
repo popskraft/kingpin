@@ -1,78 +1,78 @@
-# ОТЧЕТ ПО ИГРОВОЙ СИМУЛЯЦИИ KINGPIN
+# KINGPIN Tournament Simulation Report
 
-**Общая информация:**
-- Игр на матчап: 5000
-- Всего игр: 30000
-- Матчапов: 6
+**General Information:**
+- Games per matchup: 5000
+- Total games: 30000
+- Matchups: 6
 
-## Общий рейтинг кастов
+## Overall Faction Rankings
 
 1. **GANGSTERS**
-   - Винрейт: 42.5%
-   - Побед: 6369/15000
-   - Поражений: 5751/15000
-   - Ничьих: 2880/15000
+   - Win rate: 42.5%
+   - Wins: 6369/15000
+   - Losses: 5751/15000
+   - Draws: 2880/15000
 
 2. **AUTHORITIES**
-   - Винрейт: 40.1%
-   - Побед: 6017/15000
-   - Поражений: 3824/15000
-   - Ничьих: 5159/15000
+   - Win rate: 40.1%
+   - Wins: 6017/15000
+   - Losses: 3824/15000
+   - Draws: 5159/15000
 
 3. **LONERS**
-   - Винрейт: 36.8%
-   - Побед: 5522/15000
-   - Поражений: 5499/15000
-   - Ничьих: 3979/15000
+   - Win rate: 36.8%
+   - Wins: 5522/15000
+   - Losses: 5499/15000
+   - Draws: 3979/15000
 
 4. **SOLO**
-   - Винрейт: 30.8%
-   - Побед: 4625/15000
-   - Поражений: 7459/15000
-   - Ничьих: 2916/15000
+   - Win rate: 30.8%
+   - Wins: 4625/15000
+   - Losses: 7459/15000
+   - Draws: 2916/15000
 
-## Детальные результаты матчапов
+## Detailed Matchup Results
 
 ### GANGSTERS vs AUTHORITIES
-- **gangsters**: 20.5% (1023 побед)
-- **authorities**: 44.2% (2211 побед)
-- **Ничьи**: 35.3% (1766)
-- Средняя длина игры: 20.0 ходов
+- **gangsters**: 20.5% (1023 wins)
+- **authorities**: 44.2% (2211 wins)
+- **Draws**: 35.3% (1766)
+- Average game length: 20.0 turns
 
 ### GANGSTERS vs LONERS
-- **gangsters**: 51.8% (2592 побед)
-- **loners**: 39.7% (1987 побед)
-- **Ничьи**: 8.4% (421)
-- Средняя длина игры: 20.0 ходов
+- **gangsters**: 51.8% (2592 wins)
+- **loners**: 39.7% (1987 wins)
+- **Draws**: 8.4% (421)
+- Average game length: 20.0 turns
 
 ### GANGSTERS vs SOLO
-- **gangsters**: 55.1% (2754 побед)
-- **solo**: 31.1% (1553 побед)
-- **Ничьи**: 13.9% (693)
-- Средняя длина игры: 20.0 ходов
+- **gangsters**: 55.1% (2754 wins)
+- **solo**: 31.1% (1553 wins)
+- **Draws**: 13.9% (693)
+- Average game length: 20.0 turns
 
 ### AUTHORITIES vs LONERS
-- **authorities**: 25.9% (1296 побед)
-- **loners**: 26.8% (1340 побед)
-- **Ничьи**: 47.3% (2364)
-- Средняя длина игры: 20.0 ходов
+- **authorities**: 25.9% (1296 wins)
+- **loners**: 26.8% (1340 wins)
+- **Draws**: 47.3% (2364)
+- Average game length: 20.0 turns
 
 ### AUTHORITIES vs SOLO
-- **authorities**: 50.2% (2510 побед)
-- **solo**: 29.2% (1461 побед)
-- **Ничьи**: 20.6% (1029)
-- Средняя длина игры: 20.0 ходов
+- **authorities**: 50.2% (2510 wins)
+- **solo**: 29.2% (1461 wins)
+- **Draws**: 20.6% (1029)
+- Average game length: 20.0 turns
 
 ### LONERS vs SOLO
-- **loners**: 43.9% (2195 побед)
-- **solo**: 32.2% (1611 побед)
-- **Ничьи**: 23.9% (1194)
-- Средняя длина игры: 20.0 ходов
+- **loners**: 43.9% (2195 wins)
+- **solo**: 32.2% (1611 wins)
+- **Draws**: 23.9% (1194)
+- Average game length: 20.0 turns
 
-## Анализ баланса
+## Balance Analysis
 
-**Разрыв в винрейтах**: 11.6%
-⚡ **УМЕРЕННЫЙ ДИСБАЛАНС** - разрыв превышает 10%
+**Win-rate gap**: 11.6%
+⚡ **MODERATE IMBALANCE** — gap exceeds 10%
 
-**Самая сильная каста**: gangsters (42.5%)
-**Самая слабая каста**: solo (30.8%)
+**Strongest group**: gangsters (42.5%)
+**Weakest group**: solo (30.8%)
