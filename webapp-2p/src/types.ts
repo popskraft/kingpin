@@ -3,7 +3,7 @@ export type Card = {
   name: string
   type?: string
   faction?: string
-  caste?: string
+  clan?: string
   hp?: number
   atk?: number
   d?: number
