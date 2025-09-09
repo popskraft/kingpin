@@ -1,14 +1,14 @@
 from __future__ import annotations
 from typing import List, Dict
 import random
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from .models import GameState, PlayerState, Slot, TurnPhase
 from .actions import Action, Attack, Defend, Influence, DiscardCard, Draw
 
 
 class Ctx(BaseModel):
     state: GameState
-    log: List[Dict] = []
+    log: List[Dict] = Field(default_factory=list)
 
 
 def _card_trait(card, key: str, default: int = 0) -> int:
@@ -61,10 +61,7 @@ def _authority_bonus(p: PlayerState) -> int:
     bonus = 0
     for s in p.slots:
         if s.card and getattr(s.card, "type", None) == "boss":
-            try:
-                from .engine import _card_trait  # self import safe at runtime
-            except Exception:
-                pass
+            # прямой вызов локальной функции без динамического импорта
             bonus = max(bonus, _card_trait(s.card, "authority", 0))
     return bonus
 
@@ -109,8 +106,10 @@ def _on_enter_slot(ctx: Ctx, owner_pid: str, slot_index: int) -> None:
             # Effect: steal N from opponent reserve (up to available)
             if "steal" in on_enter:
                 amount = int(on_enter.get("steal", 0))
+                take = 0
+                # определяем оппонента заранее для корректного логирования
+                op = ctx.state.get_player(ctx.state.opponent_id() if owner_pid == ctx.state.active_player else ctx.state.active_player)
                 if amount > 0:
-                    op = ctx.state.get_player(ctx.state.opponent_id() if owner_pid == ctx.state.active_player else ctx.state.active_player)
                     take = min(amount, max(0, op.tokens.reserve_money))
                     if take > 0:
                         op.tokens.reserve_money -= take

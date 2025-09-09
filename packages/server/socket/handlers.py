@@ -31,15 +31,15 @@ async def set_visible_slots_handler(
     MAX_SLOTS: int,
     log_fn: Callable[[str, str, str], None],
     emit_views_fn: Callable[[str], Any],
-) -> None:
+) -> Dict[str, Any] | None:
     info = sid_index.get(sid)
     if not info:
-        return
+        return {"error": "bad_session"}
     room = info["room"]
     pid = info["pid"]
     r = rooms.get(room)
     if not r:
-        return
+        return {"error": "room_not_found"}
     try:
         n = int(data.get("count", INIT_VISIBLE_SLOTS))
     except Exception:
@@ -49,6 +49,7 @@ async def set_visible_slots_handler(
     r["visible_slots"][pid] = n
     log_fn(room, "ui", f"{pid} set visible slots to {n}")
     await emit_views_fn(room)
+    return None
 
 
 async def add_shield_from_reserve_handler(
@@ -59,33 +60,34 @@ async def add_shield_from_reserve_handler(
     *,
     log_fn: Callable[[str, str, str], None],
     emit_views_fn: Callable[[str], Any],
-) -> None:
+) -> Dict[str, Any] | None:
     info = sid_index.get(sid)
     if not info:
-        return
+        return {"error": "bad_session"}
     room = info["room"]
     pid = info["pid"]
     st: GameState = rooms.get(room, {}).get("state")
     if not st:
-        return
+        return {"error": "room_not_found"}
     try:
         si = int(data.get("slotIndex", -1))
         count = int(data.get("count", 1))
     except Exception:
-        return
+        return {"error": "bad_request"}
     if si < 0 or si >= len(st.players[pid].slots):
-        return
+        return {"error": "bad_index"}
     n = max(0, count)
     if n <= 0:
-        return
+        return {"error": "bad_count"}
     p = st.players[pid]
     take = min(n, max(0, p.tokens.reserve_money))
     if take <= 0:
-        return
+        return {"error": "insufficient_funds"}
     p.tokens.reserve_money -= take
     p.slots[si].muscles += take
     log_fn(room, "token", f"{pid} spent {take} money → +{take} shield on slot {si+1}")
     await emit_views_fn(room)
+    return None
 
 
 async def draw_handler(
@@ -97,15 +99,15 @@ async def draw_handler(
     *,
     log_fn: Callable[[str, str, str], None],
     emit_views_fn: Callable[[str], Any],
-) -> None:
+) -> Dict[str, Any] | None:
     info = sid_index.get(sid)
     if not info:
-        return
+        return {"error": "bad_session"}
     room = info["room"]
     pid = info["pid"]
     r = rooms.get(room)
     if not r:
-        return
+        return {"error": "room_not_found"}
     st: GameState = r["state"]
     if not st.deck:
         if st.shelf:
@@ -114,11 +116,12 @@ async def draw_handler(
             st.shelf.clear()
     if not st.deck:
         await sio.emit("error", {"msg": "deck_empty"}, to=sid)
-        return
+        return {"error": "deck_empty"}
     card = st.deck.pop(0)
     st.players[pid].hand.append(card)
     log_fn(room, "draw", f"{pid} drew a card")
     await emit_views_fn(room)
+    return None
 
 
 async def move_card_handler(
@@ -130,15 +133,15 @@ async def move_card_handler(
     *,
     log_fn: Callable[[str, str, str], None],
     emit_views_fn: Callable[[str], Any],
-) -> None:
+) -> Dict[str, Any] | None:
     info = sid_index.get(sid)
     if not info:
-        return
+        return {"error": "bad_session"}
     room = info["room"]
     pid = info["pid"]
     r = rooms.get(room)
     if not r:
-        return
+        return {"error": "room_not_found"}
     st: GameState = r["state"]
     from_zone = data.get("from")
     to_zone = data.get("to")
@@ -150,15 +153,15 @@ async def move_card_handler(
         try:
             card = p.hand.pop(int(from_index))
         except Exception:
-            return
+            return {"error": "bad_index"}
         try:
             si = int(to_index)
         except Exception:
             p.hand.append(card)
-            return
+            return {"error": "bad_index"}
         if si < 0 or si >= len(p.slots):
             p.hand.append(card)
-            return
+            return {"error": "bad_index"}
         slot = p.slots[si]
         if slot.card is None:
             slot.card = card
@@ -173,12 +176,12 @@ async def move_card_handler(
         try:
             si = int(from_index)
         except Exception:
-            return
+            return {"error": "bad_index"}
         if si < 0 or si >= len(p.slots):
-            return
+            return {"error": "bad_index"}
         slot = p.slots[si]
         if slot.card is None:
-            return
+            return {"error": "empty_slot"}
         card = slot.card
         p.hand.append(card)
         slot.card = None
@@ -189,9 +192,9 @@ async def move_card_handler(
             si = int(from_index)
             di = int(to_index)
         except Exception:
-            return
+            return {"error": "bad_index"}
         if si < 0 or si >= len(p.slots) or di < 0 or di >= len(p.slots):
-            return
+            return {"error": "bad_index"}
         s_from = p.slots[si]
         s_to = p.slots[di]
         s_from.card, s_to.card = s_to.card, s_from.card
@@ -203,19 +206,19 @@ async def move_card_handler(
             try:
                 card = p.hand.pop(int(from_index))
             except Exception:
-                return
+                return {"error": "bad_index"}
             st.discard_out_of_game.append(card)
             log_fn(room, "discard", f"{pid} discarded {card.name} to Discard pile")
         elif from_zone == "slot":
             try:
                 si = int(from_index)
             except Exception:
-                return
+                return {"error": "bad_index"}
             if si < 0 or si >= len(p.slots):
-                return
+                return {"error": "bad_index"}
             slot = p.slots[si]
             if slot.card is None:
-                return
+                return {"error": "empty_slot"}
             card = slot.card
             st.discard_out_of_game.append(card)
             slot.card = None
@@ -226,19 +229,19 @@ async def move_card_handler(
             try:
                 card = p.hand.pop(int(from_index))
             except Exception:
-                return
+                return {"error": "bad_index"}
             st.shelf.append(card)
             log_fn(room, "shelve", f"{pid} placed {card.name} on Reserve pile")
         elif from_zone == "slot":
             try:
                 si = int(from_index)
             except Exception:
-                return
+                return {"error": "bad_index"}
             if si < 0 or si >= len(p.slots):
-                return
+                return {"error": "bad_index"}
             slot = p.slots[si]
             if slot.card is None:
-                return
+                return {"error": "empty_slot"}
             card = slot.card
             st.shelf.append(card)
             slot.card = None
@@ -247,37 +250,38 @@ async def move_card_handler(
     elif from_zone == "shelf" and to_zone == "hand":
         if pid != st.active_player:
             await sio.emit("error", {"msg": "not_your_turn"}, to=sid)
-            return
+            return {"error": "not_your_turn"}
         try:
             idx = int(from_index)
             if idx < 0 or idx >= len(st.shelf):
-                return
+                return {"error": "bad_index"}
         except Exception:
-            return
+            return {"error": "bad_index"}
         card = st.shelf.pop(idx)
         p.hand.append(card)
         log_fn(room, "unshelve", f"{pid} took {card.name} from Reserve pile to hand")
     elif from_zone == "shelf" and to_zone == "slot":
         if pid != st.active_player:
             await sio.emit("error", {"msg": "not_your_turn"}, to=sid)
-            return
+            return {"error": "not_your_turn"}
         try:
             idx = int(from_index)
             si = int(to_index)
         except Exception:
-            return
+            return {"error": "bad_index"}
         if idx < 0 or idx >= len(st.shelf) or si < 0 or si >= len(p.slots):
-            return
+            return {"error": "bad_index"}
         slot = p.slots[si]
         if slot.card is not None:
-            return
+            return {"error": "slot_not_empty"}
         card = st.shelf.pop(idx)
         slot.card = card
         slot.face_up = True
         log_fn(room, "unshelve", f"{pid} played {card.name} from shelf to slot {si+1}")
     else:
-        return
+        return {"error": "bad_request"}
     await emit_views_fn(room)
+    return None
 
 
 async def remove_shield_to_reserve_handler(
@@ -288,33 +292,34 @@ async def remove_shield_to_reserve_handler(
     *,
     log_fn: Callable[[str, str, str], None],
     emit_views_fn: Callable[[str], Any],
-) -> None:
+) -> Dict[str, Any] | None:
     info = sid_index.get(sid)
     if not info:
-        return
+        return {"error": "bad_session"}
     room = info["room"]
     pid = info["pid"]
     st: GameState = rooms.get(room, {}).get("state")
     if not st:
-        return
+        return {"error": "room_not_found"}
     try:
         si = int(data.get("slotIndex", -1))
         count = int(data.get("count", 1))
     except Exception:
-        return
+        return {"error": "bad_request"}
     if si < 0 or si >= len(st.players[pid].slots):
-        return
+        return {"error": "bad_index"}
     n = max(0, count)
     if n <= 0:
-        return
+        return {"error": "bad_count"}
     p = st.players[pid]
     give = min(n, max(0, p.slots[si].muscles))
     if give <= 0:
-        return
+        return {"error": "no_shields"}
     p.slots[si].muscles -= give
     p.tokens.reserve_money += give
     log_fn(room, "token", f"{pid} returned {give} shield → +{give} money to reserve from slot {si+1}")
     await emit_views_fn(room)
+    return None
 
 
 async def flip_card_handler(

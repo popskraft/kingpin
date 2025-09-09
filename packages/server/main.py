@@ -154,7 +154,9 @@ async def remove_op_shield(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await remove_op_shield_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await remove_op_shield_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -165,7 +167,9 @@ async def add_shield_only(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await add_shield_only_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await add_shield_only_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -176,7 +180,9 @@ async def remove_shield_only(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await remove_shield_only_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await remove_shield_only_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -187,7 +193,9 @@ async def add_shield_from_reserve(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await add_shield_from_reserve_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await add_shield_from_reserve_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -198,7 +206,9 @@ async def remove_shield_to_reserve(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await remove_shield_to_reserve_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await remove_shield_to_reserve_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -209,7 +219,9 @@ async def start_attack(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await start_attack_handler(sid, data, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    resp = await start_attack_handler(sid, data, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -217,7 +229,9 @@ async def attack_update_plan(sid, data):
     async def emit(room_id: str):
         await _emit_views(room_id)
 
-    await attack_update_plan_handler(sid, data, rooms, sid_index, emit_views_fn=emit)
+    resp = await attack_update_plan_handler(sid, data, rooms, sid_index, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -228,7 +242,9 @@ async def attack_propose(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await attack_propose_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    resp = await attack_propose_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -239,7 +255,9 @@ async def attack_accept(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await attack_accept_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    resp = await attack_accept_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -250,7 +268,9 @@ async def attack_cancel(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await attack_cancel_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    resp = await attack_cancel_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -271,7 +291,9 @@ async def draw(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await draw_handler(sio, sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await draw_handler(sio, sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error") and resp["error"] != "deck_empty":
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -282,7 +304,9 @@ async def move_card(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await move_card_handler(sio, sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await move_card_handler(sio, sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -319,7 +343,9 @@ async def flip_card(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await flip_card_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await flip_card_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -330,7 +356,9 @@ async def add_token(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await add_token_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await add_token_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -341,7 +369,9 @@ async def remove_token(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
 
-    await remove_token_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    resp = await remove_token_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event
@@ -352,7 +382,9 @@ async def shuffle_deck(sid, data):
     def log(room_id: str, kind: str, msg: str):
         _log(room_id, kind, msg)
 
-    await shuffle_deck_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    resp = await shuffle_deck_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
+    if isinstance(resp, dict) and resp.get("error"):
+        await sio.emit("error", {"msg": resp["error"]}, to=sid)
 
 
 @sio.event

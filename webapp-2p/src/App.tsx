@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { connectSocket, Socket } from './services/socket'
+import { useSocket } from './services/useSocket'
 import type { ViewState, Card, Slot, LogEntry, AttackMeta } from './types'
 import CardView from './components/CardView'
 import { getClanStripeClass } from './components/cardHelpers'
@@ -25,13 +25,16 @@ type TokenDrag = { kind: 'money' | 'shield', owner: 'you' | 'opponent' | 'bank',
 // SlotView moved to components/
 
 export default function App(): JSX.Element {
-  const [socket, setSocket] = useState<Socket | null>(null)
-  const [view, setView] = useState<ViewState | null>(null)
   const [source, setSource] = useState<'yaml' | 'csv'>('yaml')
-  const [seat, setSeat] = useState<'P1' | 'P2' | null>(null)
   const boardRef = useRef<HTMLDivElement | null>(null)
-  const [oppCursor, setOppCursor] = useState<{ x: number, y: number, visible: boolean }>({ x: 0.5, y: 0.5, visible: false })
-  const lastSent = useRef<number>(0)
+  const {
+    socket, view, seat, oppCursor,
+    draw, flip, moveFromHandToSlot, moveFromSlotToSlot, moveFromSlotToHand,
+    setVisibleSlots, addShieldFromReserve, removeShieldToReserve, addShieldOnly, removeShieldOnly,
+    addMoney, removeMoney, shuffleDeck, resetRoom, endTurn,
+    startAttack, updateAttackPlan, proposeAttack, acceptAttack, cancelAttack,
+    emitCursor,
+  } = useSocket(SERVER_URL, ROOM)
   // Attack selection state (client-side)
   const [selectedAttackers, setSelectedAttackers] = useState<number[]>([])
   // Local attack modal state
@@ -85,51 +88,15 @@ export default function App(): JSX.Element {
     document.title = `KINGPIN — Seat ${seat ?? '—'}`
   }, [seat])
 
+  // Track source from 'joined' payload via socket
   useEffect(() => {
-    // Allow both websocket and polling to avoid connection issues in dev/proxy environments
-    const s = connectSocket(SERVER_URL)
-    setSocket(s)
-
-    s.on('connect', () => {
-      // wait for acknowledged 'connected'
-    })
-    s.on('connected', () => {
-      s.emit('join_room', { room: ROOM, source })
-    })
-    s.on('joined', (payload: any) => {
-      setSeat(payload.seat)
-      if (payload?.source === 'yaml' || payload?.source === 'csv') {
-        setSource(payload.source)
-      }
-    })
-    s.on('state', (st: ViewState) => {
-      setView(st)
-    })
-    s.on('room_full', () => {
-      alert('Room is full')
-    })
-    s.on('cursor', (payload: any) => {
-      // Ignore our own echo (server already skips, but be safe)
-      if (!payload) return
-      if (payload.pid === seat) return
-      const x = Math.max(0, Math.min(1, Number(payload.x) || 0))
-      const y = Math.max(0, Math.min(1, Number(payload.y) || 0))
-      const visible = !!payload.visible
-      setOppCursor({ x, y, visible })
-    })
-    s.on('error', (payload: any) => {
-      if (payload?.msg === 'deck_empty') {
-        alert('Deck is empty')
-      } else {
-        console.warn('Server error', payload)
-      }
-    })
-
-    return () => {
-      s.disconnect()
+    if (!socket) return
+    const handler = (payload: any) => {
+      if (payload?.source === 'yaml' || payload?.source === 'csv') setSource(payload.source)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    socket.on('joined', handler)
+    return () => { socket.off('joined', handler) }
+  }, [socket])
 
   const you = view?.you
   const opp = view?.opponent
@@ -301,43 +268,33 @@ export default function App(): JSX.Element {
     if (turn?.number != null) turnAlertDismissedRef.current = turn.number
   }
 
-  const handleDraw = () => socket?.emit('draw', { room: ROOM })
-  const handleFlip = (i: number) => socket?.emit('flip_card', { room: ROOM, slotIndex: i })
-  const moveFromHandToSlot = (handIndex: number, slotIndex: number) => socket?.emit('move_card', { room: ROOM, from: 'hand', to: 'slot', fromIndex: handIndex, toIndex: slotIndex })
-  const moveFromSlotToSlot = (fromIndex: number, toIndex: number) => socket?.emit('move_card', { room: ROOM, from: 'slot', to: 'slot', fromIndex, toIndex })
-  const moveFromSlotToHand = (slotIndex: number) => socket?.emit('move_card', { room: ROOM, from: 'slot', to: 'hand', fromIndex: slotIndex })
-  const sendSetVisible = (n: number) => socket?.emit('set_visible_slots', { room: ROOM, count: n })
+  const handleDraw = () => draw()
+  const handleFlip = (i: number) => flip(i)
+  const sendSetVisible = (n: number) => setVisibleSlots(n)
   // Shield ops
-  const addShieldFromReserve = (i: number) => socket?.emit('add_shield_from_reserve', { room: ROOM, slotIndex: i, count: 1 })
-  const removeShieldToReserve = (i: number) => socket?.emit('remove_shield_to_reserve', { room: ROOM, slotIndex: i, count: 1 })
-  const addShieldOnly = (i: number) => socket?.emit('add_shield_only', { room: ROOM, slotIndex: i, count: 1 })
-  const removeShieldOnly = (i: number) => socket?.emit('remove_shield_only', { room: ROOM, slotIndex: i, count: 1 })
-  const addMoney = (n: number) => socket?.emit('add_token', { room: ROOM, kind: 'money', count: n })
-  const removeMoney = (n: number) => socket?.emit('remove_token', { room: ROOM, kind: 'money', count: n })
-  const shuffleDeck = () => socket?.emit('shuffle_deck', { room: ROOM })
-  const resetRoom = () => {
-    if (confirm('Reset the room and drop all game progress? This cannot be undone.')) {
-      socket?.emit('reset_room', { room: ROOM, source })
+  // shield/money helpers provided by useSocket via imported names
+  // resetRoomLocal: minimal reset with confirmation
+  const resetRoomLocal = () => {
+    if (window.confirm('Reset room and reload from CSV? This drops all progress for both players.')) {
+      resetRoom('csv')
+      // Clear local-only UI state
+      setSelectedAttackers([])
+      setLocalAttackModal(null)
+      setPreview(null)
+      turnAlertDismissedRef.current = null
     }
   }
-  const endTurn = () => socket?.emit('end_turn', { room: ROOM })
+  const endTurnLocal = () => endTurn()
 
   // Attack socket helpers
-  const emitStartAttack = (attackerSlots: number[], targetSlot: number) => socket?.emit('start_attack', { room: ROOM, attackerSlots, targetSlot })
-  const emitUpdatePlan = (patch: Partial<{ removeShields: number, destroyCard: boolean }>) => socket?.emit('attack_update_plan', { room: ROOM, ...patch })
-  const emitPropose = () => socket?.emit('attack_propose', { room: ROOM })
-  const emitAccept = () => socket?.emit('attack_accept', { room: ROOM })
-  const emitCancel = () => socket?.emit('attack_cancel', { room: ROOM })
+  const emitStartAttack = (attackerSlots: number[], targetSlot: number) => startAttack(attackerSlots, targetSlot)
+  const emitUpdatePlan = (patch: Partial<{ removeShields: number, destroyCard: boolean }>) => updateAttackPlan(patch)
+  const emitPropose = () => proposeAttack()
+  const emitAccept = () => acceptAttack()
+  const emitCancel = () => cancelAttack()
   const emitApprove = emitAccept
 
   const visibleYou = view?.meta?.visible_slots?.you ?? 6
-
-  const emitCursor = (x: number, y: number, visible = true) => {
-    const now = performance.now()
-    if (now - (lastSent.current || 0) < 40) return // ~25 fps throttle
-    lastSent.current = now
-    socket?.emit('cursor', { room: ROOM, x, y, visible })
-  }
 
   const onBoardMouseMove = (e: React.MouseEvent) => {
     const el = boardRef.current
@@ -505,7 +462,7 @@ export default function App(): JSX.Element {
           <button id="btn_draw_top" onClick={handleDraw}>Draw</button>
           <button id="btn_end_turn" onClick={endTurn} disabled={!isYourTurn} title="End turn">End Turn</button>
           {selectedAttackers.length > 0 && <button id="btn_clear_selection" onClick={clearAttackSelection} disabled={!!attack || !!localAttackModal} title="Clear attack selection">Clear Selection ({selectedAttackers.length})</button>}
-          <button id="btn_reset" className="danger" onClick={resetRoom} title="Reset room (drop progress)">Reset</button>
+          <button id="btn_reset" className="danger" onClick={resetRoomLocal} title="Reset room (drop progress)">Reset</button>
         </div>
       </header>
 
