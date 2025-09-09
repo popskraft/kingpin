@@ -512,7 +512,6 @@ async def start_attack(sid, data):
     if st.players[op_pid].slots[target_slot].card is None:
         return
     valid_attackers: List[int] = []
-    factions: List[str] = []
     for i in attacker_slots:
         if 0 <= i < len(st.players[pid].slots):
             s = st.players[pid].slots[i]
@@ -520,16 +519,21 @@ async def start_attack(sid, data):
                 atk = int(getattr(s.card, "atk", 0)) if s.card else 0
             except Exception:
                 atk = 0
-            faction = ((getattr(s.card, "faction", "") or "").strip() if s.card else "")
-            if s.card is not None and atk > 0 and faction:
+            # Any card with ATK>0 may attack; no faction restriction
+            if s.card is not None and atk > 0:
                 valid_attackers.append(i)
-                factions.append(faction)
     if not valid_attackers:
         return
-    # Enforce same-faction attackers
-    if len(set(factions)) != 1:
-        return
-    # No limit on number of attackers (removed 2-attacker restriction)
+    # Determine if the player's entire board is mono-clan
+    try:
+        slots = st.players[pid].slots
+        board_clans = [((getattr(sl.card, "clan", "") or "").strip()) for sl in slots if getattr(sl, "card", None) is not None]
+        mono_clan = (len(board_clans) > 0) and (len(set(board_clans)) == 1) and (board_clans[0] != "")
+    except Exception:
+        mono_clan = False
+    # Enforce attacker count limit: max 3 unless mono-clan board
+    if not mono_clan and len(valid_attackers) > 3:
+        valid_attackers = valid_attackers[:3]
     # Initialize attack meta
     r["attack"] = {
         "attacker": pid,

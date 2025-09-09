@@ -49,7 +49,9 @@ CSV_COLUMN_MAPPINGS = {
     'price': ['Price'],
     'corruption': ['Corruption'],
     'rage': ['Rage'],
-    'abl': ['ABL'],
+    # Support both old ABL and new Modifiers fields
+    'abl': ['ABL', 'Modifiers'],
+    'modifiers': ['Modifiers', 'ABL'],
     'notes': ['Description'],
     'in_deck': ['InDeck', 'In Deck'],
     'independence': ['Independence'],

@@ -125,9 +125,9 @@ Note: This rule intentionally models “credit-based affordability.” Players m
 
 #### 3.2.3 Attack Opponent
 - Select attacking cards (ATK > 0)
-- Only cards of the same faction can be selected together for a combined attack (max 2 cards).
-- Cards without a faction cannot be selected as attackers.
-- UI: the first selected attacker gets a red border; a second card can only be selected (red border) if it shares the same faction.
+- Combined attack size: up to 3 attackers.
+- Exception — Mono-clan board: if all cards on your board share the same clan (see 4.1), you may select any number of your cards to attack together (no limit).
+- No same-faction requirement for combined attacks.
 - Ammunition (💰 spending): after choosing attackers and before damage calculation, you may spend any amount of 💰 from your safe to add +1.0 ATK per 1💰 to this attack. Spent 💰 is permanently removed from your safe.
 - Total damage: ATK + Rage + shields contribution + ammunition (💰)
 - Damage absorption order: 🛡️ → card HP
@@ -200,9 +200,9 @@ Example:
 - Total damage = 3 + 2 + 0.75 + 2 = 7.75.
 
 ### 6.2 Combined Attacks
-- Up to 2 cards can attack together in a combined attack
-- All selected attackers must share the same faction
-- Cards without a faction cannot join combined attacks
+- Up to 3 cards can attack together in a combined attack
+- Exception — Mono-clan board: if all cards on your board share the same clan (see 4.1), any number of your cards may attack together (no limit)
+- No same-faction requirement for combined attacks
 - Can remove defense first, then attack
 - Can bribe defenders, then attack
 

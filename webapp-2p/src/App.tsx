@@ -595,23 +595,19 @@ export default function App(): JSX.Element {
   }
   const onBoardMouseLeave = () => emitCursor(0, 0, false)
 
-  // Attack selection handlers (same-faction only, no limit on number, faction required)
+  // Attack selection handlers (max 3 attackers; unlimited if mono-clan board; no faction requirement)
   const toggleSelectAttacker = (i: number) => {
     const card = you?.board?.[i]?.card
     if (!card) return
     const atk = (card.atk ?? 0)
-    const faction = (card.faction || '').trim()
     if (atk <= 0) return
-    if (!faction) return // non-faction cards cannot be selected
+    // Determine if your board is mono-clan (all cards on board share the same clan)
+    const monoClan = detectClanSynergyKey(you?.board) != null
     setSelectedAttackers(prev => {
-      // If already selected, toggle off
+      // Toggle off if already selected
       if (prev.includes(i)) return prev.filter(x => x !== i)
-      // Enforce same-faction when adding new attacker
-      if (prev.length >= 1) {
-        const first = you?.board?.[prev[0]]?.card
-        const firstFaction = (first?.faction || '').trim()
-        if (!firstFaction || firstFaction !== faction) return prev
-      }
+      // Enforce attacker-count cap: 3 unless mono-clan
+      if (!monoClan && prev.length >= 3) return prev
       return [...prev, i]
     })
   }
