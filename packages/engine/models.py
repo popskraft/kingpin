@@ -32,8 +32,6 @@ class Card(BaseModel):
     faction: Faction | str = Faction.neutral
     # Primary terminology
     clan: Optional[str] = None
-    # Deprecated legacy field kept for backward compatibility
-    caste: Optional[str] = None
     hp: int = 1
     atk: int = 0
     d: int = 0  # base defend (shield limit)
@@ -64,13 +62,6 @@ class Card(BaseModel):
         fac = values.get("faction")
         if isinstance(fac, str) and fac == "goverment":
             values["faction"] = "government"
-        # Populate legacy 'caste' from 'clan' if only clan provided (and vice versa) for compatibility
-        clan = values.get("clan")
-        caste = values.get("caste")
-        if clan and not caste:
-            values["caste"] = clan
-        if caste and not clan:
-            values["clan"] = caste
         return values
 
 

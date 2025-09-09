@@ -1,4 +1,4 @@
-# KINGPIN Game Experience Analysis
+# Analysis — Game Experience (KINGPIN)
 
 ## General Game Characteristics
 

@@ -120,7 +120,7 @@ def test_webapp_compatibility():
         card_dict = card.model_dump()
         
         # Check webapp expected fields
-        webapp_fields = ['id', 'name', 'type', 'faction', 'caste', 'hp', 'atk', 'd', 'price', 'corruption', 'rage', 'notes']
+        webapp_fields = ['id', 'name', 'type', 'faction', 'clan', 'hp', 'atk', 'd', 'price', 'corruption', 'rage', 'notes']
         for field in webapp_fields:
             assert field in card_dict, f"Missing webapp field: {field}"
         

@@ -1,4 +1,4 @@
-# KINGPIN Clan Balance Report
+# Report — Balance (KINGPIN)
 
 ## Methodology
 

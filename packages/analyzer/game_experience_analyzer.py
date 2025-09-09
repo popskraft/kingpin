@@ -76,7 +76,7 @@ class GameExperienceAnalyzer:
         # Базовые характеристики
         total_cards = len(self.deck_cards)
         unique_abilities = len(set(str(c.abl) for c in self.deck_cards if c.abl))
-        clans = set(c.caste for c in self.deck_cards if c.caste)
+        clans = set(c.clan for c in self.deck_cards if c.clan)
         clans_count = len(clans)
         
         # Сложность карт (количество слов в способностях)

@@ -65,8 +65,8 @@ def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List
                 'name': _get_column_value('name') or f"Card {len(cards)}",
                 'type': (_get_column_value('type') or 'common').lower(),
                 'faction': (_get_column_value('faction') or 'neutral').lower(),
-                # Terminology: primary 'clan'; fallback to legacy English 'caste'
-                'clan': (_get_column_value('clan') or _get_column_value('caste') or '').strip() or None,
+                # Terminology: primary 'clan' only
+                'clan': (_get_column_value('clan') or '').strip() or None,
                 'hp': _to_int(_get_column_value('hp', 1), 1),
                 'atk': _to_int(_get_column_value('atk', 0), 0),
                 'd': _to_int(_get_column_value('defend', 0), 0),
@@ -79,9 +79,7 @@ def load_cards_from_csv(csv_path: str | Path, include_all: bool = False) -> List
                 'pair_d': _to_int(_get_column_value('pair_d', 0), 0),
                 'pair_r': _to_int(_get_column_value('pair_r', 0), 0),
             }
-            # Mirror to legacy field for compatibility during transition
-            if card_data.get('clan'):
-                card_data['caste'] = card_data['clan']
+            # No legacy mirroring; 'caste' removed
             
             # Parse ABL if present
             abl_text = (_get_column_value('abl') or '').strip()

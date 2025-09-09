@@ -1,4 +1,4 @@
-# KINGPIN Proposed Changes Analysis
+# Analysis — Proposed Changes (KINGPIN)
 
 > Status: Proposal — exploratory design analysis. Does not necessarily reflect the current base rules. Use for discussion and future iterations.
 
@@ -143,4 +143,3 @@
 - Add new synergy types instead of removed factions
 - Consider a hybrid combat system (simpler but not trivial)
 - Add a tutorial mode for the purchasing system
-

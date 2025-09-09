@@ -213,8 +213,8 @@ class TestCsvCardLoader:
         finally:
             Path(csv_path).unlink()
     
-    def test_load_cards_with_clan_caste(self):
-        """Тест загрузки карт с clan/caste полями"""
+    def test_load_cards_with_clan(self):
+        """Тест загрузки карт с полем clan"""
         cards_data = [
             {
                 "ID": "clan_card",
@@ -222,12 +222,7 @@ class TestCsvCardLoader:
                 "Clan": "warriors",
                 "InDeck": "✓"
             },
-            {
-                "ID": "caste_card",
-                "Name": "Caste Card",
-                "Caste": "merchants",
-                "InDeck": "✓"
-            }
+            
         ]
         
         csv_path = self.create_test_csv(cards_data)
@@ -235,15 +230,10 @@ class TestCsvCardLoader:
         try:
             cards = load_cards_from_csv(csv_path)
             
-            assert len(cards) == 2
+            assert len(cards) == 1
             
             clan_card = next(c for c in cards if c.id == "clan_card")
             assert clan_card.clan == "warriors"
-            assert clan_card.caste == "warriors"  # автозаполнение
-            
-            caste_card = next(c for c in cards if c.id == "caste_card")
-            assert caste_card.clan == "merchants"  # автозаполнение
-            assert caste_card.caste == "merchants"
             
         finally:
             Path(csv_path).unlink()

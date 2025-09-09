@@ -53,7 +53,7 @@ class GameExperienceAnalyzer:
                         'ID': row['ID'],
                         'Название': row['Название'],
                         'Тип': row['Тип'],
-                        'Клан': row.get('Клан', row.get('Каста', '')),  # Support both headers
+                        'Clan': row.get('Clan', row.get('Клан', '')),  # Unified to English header
                         'Фракция': row['Фракция'],
                         'HP': int(row['HP']) if row['HP'].isdigit() else 0,
                         'ATK': int(row['ATK']) if row['ATK'].isdigit() else 0,

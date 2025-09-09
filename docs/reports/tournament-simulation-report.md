@@ -1,4 +1,4 @@
-# KINGPIN Tournament Simulation Report
+# Report — Tournament Simulation (KINGPIN)
 
 **General Information:**
 - Games per matchup: 5000

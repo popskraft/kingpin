@@ -24,25 +24,21 @@ GAME_CONSTANTS = {
     'max_slots': 9,
     'init_visible_slots': 6,
     'total_tokens': 40,
-    'base_tokens_per_caste': 12,
-    # Alias for terminology migration: castes -> clans
     'base_tokens_per_clan': 12,
     'additional_tokens': 4,
     'hand_limit': 6,
 }
 
 """CSV column mappings (English-only)
-Defines the allowed English column headers for CSV import. Legacy English aliases
-are supported (e.g., Caste), but non-English headers are not recognized.
+Defines the allowed English column headers for CSV import.
 """
 CSV_COLUMN_MAPPINGS = {
     'id': ['ID', 'Id'],
     'name': ['Name'],
     'type': ['Type'],
     'faction': ['Faction'],
-    # Prefer new terminology "Clan"; keep legacy English-only "Caste" for backward compatibility
+    # Terminology: Clan only
     'clan': ['Clan'],
-    'caste': ['Caste'],
     'hp': ['HP'],
     'atk': ['ATK'],
     'defend': ['Defend', 'D'],

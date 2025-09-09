@@ -1,4 +1,4 @@
-# KINGPIN Revised Changes Analysis
+# Analysis — Revised Changes (KINGPIN)
 
 > Status: Proposal — this document outlines a revised design approach and may not reflect the current base rules. Use for discussion and future iterations.
 
@@ -94,4 +94,3 @@
 3. **Pilot the purchasing system** — as an experiment in test games
 4. **Prepare the first expansion** — during base development
 5. **Create a roadmap** — a clear 2–3 year plan
-

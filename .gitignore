@@ -184,3 +184,15 @@ cython_debug/
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Node / frontend
+node_modules/
+webapp-2p/node_modules/
+webapp-2p/dist/
+webapp-2p/.vite/
+webapp-2p/.eslintcache
+webapp-2p/.tsbuildinfo
+
+# Build artifacts (frontend misc)
+dist/
+*.tsbuildinfo

@@ -36,12 +36,12 @@ def main():
     print("\n🏆 ТОП-5 САМЫХ СИЛЬНЫХ КАРТ:")
     top_cards = analyzer.get_top_cards_by_rating(5)
     for i, (card, rating) in enumerate(top_cards, 1):
-        print(f"{i}. {card.name} ({card.caste}) - {rating:.2f}")
+        print(f"{i}. {card.name} ({getattr(card, 'clan', '')}) - {rating:.2f}")
     
     print("\n⚠️ ТОП-5 САМЫХ СЛАБЫХ КАРТ:")
     weak_cards = analyzer.get_weakest_cards(5)
     for i, (card, rating) in enumerate(weak_cards, 1):
-        print(f"{i}. {card.name} ({card.caste}) - {rating:.2f}")
+        print(f"{i}. {card.name} ({getattr(card, 'clan', '')}) - {rating:.2f}")
     
     print(f"\n📖 Полный отчет доступен в файле: {report_file}")
 

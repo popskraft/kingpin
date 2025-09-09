@@ -1,9 +1,7 @@
 from __future__ import annotations
 from typing import Dict, Optional, List, Tuple
-from pathlib import Path
 import time
 import random
-import csv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import socketio
@@ -14,6 +12,36 @@ sys.path.append(str(Path(__file__).parent.parent))
 from engine.loader import load_game, load_yaml_config, build_state_from_config, load_cards_from_csv
 from engine.models import GameState, PlayerState, Slot, Card
 from engine.engine import initialize_game
+from .api.routes import router as api_router
+from .services.cards_index import _load_cards_index
+from .services.state import _filtered_view, _serialize_slot_for_view
+from .services.logging import append_log as _append_log
+from .socket.handlers import (
+    connect_handler,
+    disconnect_handler,
+    draw_handler,
+    move_card_handler,
+    add_shield_from_reserve_handler,
+    remove_shield_to_reserve_handler,
+    flip_card_handler,
+    add_token_handler,
+    remove_token_handler,
+    shuffle_deck_handler,
+    end_turn_handler,
+    reset_room_handler,
+    join_room_handler,
+    remove_op_shield_handler,
+    add_shield_only_handler,
+    remove_shield_only_handler,
+    start_attack_handler,
+    attack_update_plan_handler,
+    attack_propose_handler,
+    attack_accept_handler,
+    attack_cancel_handler,
+    cursor_handler,
+    set_visible_slots_handler,
+)
+from .services.setup import _build_state_from_csv as _build_state_from_csv_service
 
 # Socket.IO сервер (ASGI)
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -24,9 +52,9 @@ app_fastapi.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app_fastapi.include_router(api_router)
 app = socketio.ASGIApp(sio, other_asgi_app=app_fastapi)
 
-ROOT = Path(__file__).resolve().parents[2]
 MAX_SLOTS = 9
 INIT_VISIBLE_SLOTS = 6
 
@@ -34,216 +62,17 @@ rooms: Dict[str, dict] = {}
 sid_index: Dict[str, Dict[str, str]] = {}
 
 
-def _new_slots(n: int) -> List[Slot]:
-    return [Slot() for _ in range(n)]
-
-
-def _place_starters(state: GameState, cfg: dict) -> None:
-    starters = cfg.get("starters", {})
-    # Боссы стартуют в руке, а не на столе
-    # Разрешаем указывать стартеры как ID строкой или как словарь с id/оверрайдами
-    cards_index = _load_cards_index()
-    for pid, cards in starters.items():
-        p = state.players[pid]
-        for entry in cards:
-            try:
-                if isinstance(entry, str):
-                    data = cards_index.get(entry)
-                    if data:
-                        p.hand.append(Card(**data))
-                        continue
-                elif isinstance(entry, dict):
-                    cid = entry.get("id")
-                    if cid and cid in cards_index:
-                        base = dict(cards_index[cid])
-                        base.update(entry)
-                        p.hand.append(Card(**base))
-                        continue
-                    # Фоллбэк: использовать данные как есть
-                    p.hand.append(Card(**entry))
-                    continue
-            except Exception:
-                # В крайнем случае пропускаем некорректную запись
-                pass
-
-
-def _is_boss_card(c: Card) -> bool:
-    name = (c.name or "").lower()
-    ctype = (getattr(c, "type", "") or "").lower()
-    notes = (getattr(c, "notes", "") or "").lower()
-    text = f"{name} {ctype} {notes}"
-    return ("boss" in text) or ("босс" in text)
-
-
-def _guess_owner_from_text(text: str) -> Optional[str]:
-    t = (text or "").lower()
-    # Евристика по обозначению владельца: P1/П1, P2/П2
-    if "p1" in t or "п1" in t:
-        return "P1"
-    if "p2" in t or "п2" in t:
-        return "P2"
-    return None
-
-
-def _ensure_bosses_in_hands(st: GameState) -> None:
-    """Перемещает босс-карты в руки соответствующих игроков при старте партии.
-    Если в руках уже есть босс – ничего не делаем. Сначала ищем по владельцу,
-    затем берём любой оставшийся босс, если владелец не указан в названии."""
-    # Уже есть боссы в руках?
-    have = {pid: any(_is_boss_card(c) for c in st.players[pid].hand) for pid in ("P1", "P2")}
-
-    def take_from_deck(predicate) -> Optional[Card]:
-        for i, c in enumerate(st.deck):
-            if predicate(c):
-                return st.deck.pop(i)
-        return None
-
-    # Сначала пытаемся взять по владельцу
-    for pid in ("P1", "P2"):
-        if have[pid]:
-            continue
-        owned = take_from_deck(lambda c: _is_boss_card(c) and _guess_owner_from_text((c.name or "") + " " + (getattr(c, "notes", "") or "")) == pid)
-        if owned:
-            st.players[pid].hand.append(owned)
-            have[pid] = True
-
-    # Затем берём любой оставшийся босс, если всё ещё нет
-    for pid in ("P1", "P2"):
-        if have[pid]:
-            continue
-        any_boss = take_from_deck(lambda c: _is_boss_card(c))
-        if any_boss:
-            st.players[pid].hand.append(any_boss)
-            have[pid] = True
-
-
-def _ensure_slots(state: GameState, count: int = MAX_SLOTS) -> None:
-    for pid in ("P1", "P2"):
-        p = state.players.get(pid) or PlayerState(id=pid, hand_limit=6)
-        if len(p.slots) < count:
-            p.slots.extend(_new_slots(count - len(p.slots)))
-        state.players[pid] = p
-
-
 def _build_state_from_csv() -> Tuple[GameState, dict]:
-    """Load game state with cards from CSV file using unified loader."""
-    # Use unified loader from engine
-    csv_path = ROOT / "config" / "cards.csv"
-    st, cfg = load_game(
-        str(ROOT / "config" / "default.yaml"),
-        csv_path=csv_path
-    )
-    # Rules/UI: Reserve (Rejected) starts empty; entire deck goes to Draw pile.
-    # Some loaders may prefill a visible shelf; merge it back into the deck for start state.
-    if getattr(st, "shelf", None):
-        if len(st.shelf) > 0:
-            st.deck.extend(st.shelf)
-            st.shelf.clear()
-    
-    # Initialize game state
-    _ensure_slots(st, MAX_SLOTS)
-    _place_starters(st, cfg)
-    random.shuffle(st.deck)
-    _ensure_bosses_in_hands(st)
-    initialize_game(st)
-    return st, cfg
+    # Delegate to services implementation, keeping same signature for tests
+    return _build_state_from_csv_service(MAX_SLOTS)
 
 
 # Removed: now using unified ABL parsing from engine.loader
 
 
-def _load_caste_map() -> Dict[str, str]:
-    csv_path = ROOT / "config" / "cards.csv"
-    result: Dict[str, str] = {}
-    if not csv_path.exists():
-        return result
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            cid = (row.get("ID") or row.get("Id") or "").strip()
-            if not cid:
-                continue
-            caste = (row.get("Каста") or row.get("Caste") or "").strip()
-            if caste:
-                result[cid] = caste
-    return result
-
-
-def _load_cards_index() -> Dict[str, dict]:
-    """Load all cards from CSV using unified loader."""
-    csv_path = ROOT / "config" / "cards.csv"
-    try:
-        # Use unified card loader, load ALL cards (not just in-deck)
-        cards = load_cards_from_csv(csv_path, include_all=True)
-        # Convert to index format
-        return {card.id: card.model_dump() for card in cards}
-    except Exception:
-        return {}
-
-
-def _serialize_slot_for_view(s: Slot, for_owner: bool) -> dict:
-    if for_owner:
-        return s.model_dump()
-    # Для оппонента показываем только открытые карты; закрытые считаем пустыми
-    if s.face_up and s.card is not None:
-        return s.model_dump()
-    return {"card": None, "face_up": False, "muscles": 0}
-
-
-def _filtered_view(state: GameState, viewer_pid: str, visible_you: int, visible_op: int) -> dict:
-    you = state.players[viewer_pid]
-    op_pid = "P2" if viewer_pid == "P1" else "P1"
-    op = state.players[op_pid]
-    you_board = [_serialize_slot_for_view(s, True) for s in you.slots[:visible_you]]
-    op_board = [_serialize_slot_for_view(s, False) for s in op.slots[:visible_op]]
-    return {
-        "you": {
-            "id": viewer_pid,
-            "hand": [c.model_dump() for c in you.hand],
-            "board": you_board,
-            "tokens": you.tokens.model_dump(),
-        },
-        "opponent": {
-            "id": op_pid,
-            # Кол-во карт в руке оппонента скрываем; отдаём только открытые карты стола
-            "board": op_board,
-            # Отдаём только количество карт в руке оппонента, без идентификаторов
-            "handCount": len(op.hand),
-            "tokens": op.tokens.model_dump(),
-        },
-        "shared": {
-            "deckCount": len(state.deck),
-            "shelfCount": len(state.shelf),
-            # Список карт на полке (открытая информация): полные данные для отображения
-            "shelf": [c.model_dump() for c in state.shelf],
-            "discardCount": len(state.discard_out_of_game),
-        },
-        "meta": {
-            "visible_slots": {"you": visible_you, "opponent": visible_op},
-            "turn": {
-                "active": state.active_player,
-                "number": state.turn_number,
-                "phase": state.phase.value if hasattr(state.phase, "value") else str(state.phase),
-            },
-        },
-    }
-
-
 def _log(room_id: str, kind: str, msg: str, actor: Optional[str] = None) -> None:
-    r = rooms.get(room_id)
-    if not r:
-        return
-    st: GameState = r.get("state")
-    entry = {
-        "id": len(r.setdefault("log", [])) + 1,
-        "t": time.time(),
-        "kind": kind,
-        "msg": msg,
-        "actor": actor,
-        "turn": getattr(st, "turn_number", 0),
-        "active": getattr(st, "active_player", None),
-    }
-    r["log"].append(entry)
+    # thin wrapper for tests, delegates to services
+    _append_log(rooms, room_id, kind, msg, actor)
 
 
 async def _emit_views(room_id: str) -> None:
@@ -264,24 +93,12 @@ async def _emit_views(room_id: str) -> None:
         await sio.emit("state", view, to=sid)
 
 
-@app_fastapi.get("/")
-async def root():
-    return {
-        "ok": True,
-        "service": "KINGPIN 2P Server",
-        "health": "/health",
-        "socket_io": "/socket.io/",
-    }
-
-
-@app_fastapi.get("/health")
-async def health():
-    return {"ok": True}
+    # routes moved to api.routes
 
 
 @sio.event
 async def connect(sid, environ):
-    await sio.emit("connected", {"sid": sid}, to=sid)
+    await connect_handler(sio, sid)
 
 
 @sio.event
@@ -331,548 +148,141 @@ async def join_room(sid, data):
 
 @sio.event
 async def remove_op_shield(sid, data):
-    """Remove a shield from the opponent's slot without refunding money to them.
-    Used to simulate the opponent destroying a defender token.
-    Client sends: { slotIndex }
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r:
-        return
-    st: GameState = r["state"]
-    op_pid = "P2" if pid == "P1" else "P1"
-    try:
-        si = int(data.get("slotIndex", -1))
-    except Exception:
-        return
-    if si < 0 or si >= len(st.players[op_pid].slots):
-        return
-    slot = st.players[op_pid].slots[si]
-    if slot.muscles > 0:
-        slot.muscles -= 1
-        _log(room, "token", f"{pid} destroyed 1 shield on {op_pid}'s slot {si+1}", actor=pid)
-        await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await remove_op_shield_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def add_shield_only(sid, data):
-    """Add shield to slot without changing reserve money.
-    Used for internal shield distribution.
-    Client sends: { slotIndex, count }
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    try:
-        si = int(data.get("slotIndex", -1))
-        count = int(data.get("count", 1))
-    except Exception:
-        return
-    if si < 0 or si >= len(st.players[pid].slots):
-        return
-    st.players[pid].slots[si].muscles += max(0, count)
-    _log(room, "token", f"{pid} +{max(0, count)} shield on slot {si+1} (internal)", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await add_shield_only_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def remove_shield_only(sid, data):
-    """Remove shield from slot without changing reserve money.
-    Used for internal shield distribution.
-    Client sends: { slotIndex, count }
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    try:
-        si = int(data.get("slotIndex", -1))
-        count = int(data.get("count", 1))
-    except Exception:
-        return
-    if si < 0 or si >= len(st.players[pid].slots):
-        return
-    st.players[pid].slots[si].muscles = max(0, st.players[pid].slots[si].muscles - max(0, count))
-    _log(room, "token", f"{pid} -{max(0, count)} shield on slot {si+1} (internal)", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await remove_shield_only_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def add_shield_from_reserve(sid, data):
-    """Atomically move money from player's reserve to a shield on a slot.
-    This represents spending reserve money to place shields. Does not affect bank directly.
-    Client sends: { slotIndex, count }
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    try:
-        si = int(data.get("slotIndex", -1))
-        count = int(data.get("count", 1))
-    except Exception:
-        return
-    if si < 0 or si >= len(st.players[pid].slots):
-        return
-    n = max(0, count)
-    if n <= 0:
-        return
-    p = st.players[pid]
-    take = min(n, max(0, p.tokens.reserve_money))
-    if take <= 0:
-        return
-    p.tokens.reserve_money -= take
-    p.slots[si].muscles += take
-    _log(room, "token", f"{pid} spent {take} money → +{take} shield on slot {si+1}", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await add_shield_from_reserve_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def remove_shield_to_reserve(sid, data):
-    """Atomically move shield(s) from a slot back to player's reserve.
-    Internal redistribution: does not affect bank directly.
-    Client sends: { slotIndex, count }
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    try:
-        si = int(data.get("slotIndex", -1))
-        count = int(data.get("count", 1))
-    except Exception:
-        return
-    if si < 0 or si >= len(st.players[pid].slots):
-        return
-    n = max(0, count)
-    if n <= 0:
-        return
-    p = st.players[pid]
-    give = min(n, max(0, p.slots[si].muscles))
-    if give <= 0:
-        return
-    p.slots[si].muscles -= give
-    p.tokens.reserve_money += give
-    _log(room, "token", f"{pid} returned {give} shield → +{give} money to reserve from slot {si+1}", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await remove_shield_to_reserve_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def start_attack(sid, data):
-    """Start an attack planning session.
-    Client sends: { attackerSlots: int[], targetSlot: int }
-    Creates an ephemeral attack meta visible to both players.
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r:
-        return
-    st: GameState = r["state"]
-    try:
-        attacker_slots = list({int(i) for i in (data.get("attackerSlots") or [])})
-        attacker_slots.sort()
-        target_slot = int(data.get("targetSlot", -1))
-    except Exception:
-        return
-    if not attacker_slots:
-        return
-    op_pid = "P2" if pid == "P1" else "P1"
-    # Only the active player can initiate an attack
-    if pid != getattr(st, "active_player", None):
-        return
-    # Validate indices
-    if target_slot < 0 or target_slot >= len(st.players[op_pid].slots):
-        return
-    # Target must have a card
-    if st.players[op_pid].slots[target_slot].card is None:
-        return
-    valid_attackers: List[int] = []
-    for i in attacker_slots:
-        if 0 <= i < len(st.players[pid].slots):
-            s = st.players[pid].slots[i]
-            try:
-                atk = int(getattr(s.card, "atk", 0)) if s.card else 0
-            except Exception:
-                atk = 0
-            # Any card with ATK>0 may attack; no faction restriction
-            if s.card is not None and atk > 0:
-                valid_attackers.append(i)
-    if not valid_attackers:
-        return
-    # Determine if the player's entire board is mono-clan
-    try:
-        slots = st.players[pid].slots
-        board_clans = [((getattr(sl.card, "clan", "") or "").strip()) for sl in slots if getattr(sl, "card", None) is not None]
-        mono_clan = (len(board_clans) > 0) and (len(set(board_clans)) == 1) and (board_clans[0] != "")
-    except Exception:
-        mono_clan = False
-    # Enforce attacker count limit: max 3 unless mono-clan board
-    if not mono_clan and len(valid_attackers) > 3:
-        valid_attackers = valid_attackers[:3]
-    # Initialize attack meta
-    r["attack"] = {
-        "attacker": pid,
-        "attackerSlots": valid_attackers,
-        "target": {"pid": op_pid, "slot": target_slot},
-        "plan": {"removeShields": 0, "destroyCard": False},
-        "status": "planning",
-    }
-    _log(room, "attack", f"{pid} started attack → {op_pid} slot {target_slot+1} (attackers: {', '.join(str(i+1) for i in valid_attackers)})", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await start_attack_handler(sid, data, rooms, sid_index, emit_views_fn=emit, log_fn=log)
 
 
 @sio.event
 async def attack_update_plan(sid, data):
-    """Update the current attack plan (attacker only).
-    Client sends any of: { removeShields?: int, destroyCard?: bool }
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r or not r.get("attack"):
-        return
-    atk = r["attack"]
-    if atk.get("attacker") != pid:
-        return
-    st: GameState = r["state"]
-    target = atk.get("target") or {}
-    tpid = target.get("pid")
-    tsi = int(target.get("slot", -1))
-    if tpid not in ("P1", "P2") or tsi < 0 or tsi >= len(st.players[tpid].slots):
-        return
-    slot = st.players[tpid].slots[tsi]
-    rm = atk.setdefault("plan", {}).get("removeShields", 0)
-    dc = atk.setdefault("plan", {}).get("destroyCard", False)
-    if "removeShields" in data:
-        try:
-            rm = max(0, int(data.get("removeShields", 0)))
-        except Exception:
-            rm = 0
-        rm = min(rm, max(0, slot.muscles))
-    if "destroyCard" in data:
-        dc = bool(data.get("destroyCard", False))
-    atk["plan"] = {"removeShields": rm, "destroyCard": dc}
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    await attack_update_plan_handler(sid, data, rooms, sid_index, emit_views_fn=emit)
 
 
 @sio.event
 async def attack_propose(sid, data):
-    """Attacker proposes the current plan for opponent confirmation."""
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r or not r.get("attack"):
-        return
-    atk = r["attack"]
-    if atk.get("attacker") != pid:
-        return
-    atk["status"] = "proposed"
-    _log(room, "attack", f"{pid} proposed destruction: shields={atk.get('plan', {}).get('removeShields', 0)}, card={atk.get('plan', {}).get('destroyCard', False)}", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await attack_propose_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
 
 
 @sio.event
 async def attack_accept(sid, data):
-    """Opponent accepts the proposed plan; apply effects and close modal."""
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r or not r.get("attack"):
-        return
-    atk = r["attack"]
-    attacker = atk.get("attacker")
-    target = atk.get("target") or {}
-    tpid = target.get("pid")
-    tsi = int(target.get("slot", -1))
-    if pid != tpid:
-        # Only the target side can accept
-        return
-    if atk.get("status") != "proposed":
-        # Require explicit proposal before accept
-        return
-    st: GameState = r["state"]
-    if tpid not in ("P1", "P2") or tsi < 0 or tsi >= len(st.players[tpid].slots):
-        return
-    slot = st.players[tpid].slots[tsi]
-    plan = atk.get("plan") or {}
-    remove_n = max(0, int(plan.get("removeShields", 0)))
-    remove_n = min(remove_n, max(0, slot.muscles))
-    destroy_card = bool(plan.get("destroyCard", False))
-    # Remove shields (bank implicitly increases as shields on board decrease)
-    if remove_n > 0:
-        slot.muscles = max(0, slot.muscles - remove_n)
-    # Destroy card (send to discard) and remove any remaining shields on that slot
-    if destroy_card and slot.card is not None:
-        card = slot.card
-        st.discard_out_of_game.append(card)
-        slot.card = None
-        slot.muscles = 0
-        _log(room, "destroy", f"{attacker} destroyed {tpid}'s {getattr(card, 'name', 'card')} on slot {tsi+1}", actor=attacker)
-    else:
-        _log(room, "attack", f"{attacker} removed {remove_n} shield(s) from {tpid}'s slot {tsi+1}", actor=attacker)
-    # Close attack session
-    r["attack"] = None
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await attack_accept_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
 
 
 @sio.event
 async def attack_cancel(sid, data):
-    """Cancel the current attack session (either side)."""
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r or not r.get("attack"):
-        return
-    atk = r["attack"]
-    target = (atk or {}).get("target") or {}
-    if pid not in (atk.get("attacker"), target.get("pid")):
-        return
-    r["attack"] = None
-    _log(room, "attack", f"{pid} canceled the attack", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await attack_cancel_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
 
 
 @sio.event
 async def cursor(sid, data):
-    """Relay normalized cursor coordinates within the board to the other player in the same room.
-    Client sends: { room, x, y, visible }
-    x,y are expected in [0,1]. visible toggles rendering on receiver side.
-    """
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info.get("room")
-    pid = info.get("pid")
-    if not room:
-        return
-    try:
-        x = float(data.get("x", 0))
-        y = float(data.get("y", 0))
-        visible = bool(data.get("visible", True))
-    except Exception:
-        x, y, visible = 0.0, 0.0, False
-    payload = {"pid": pid, "x": max(0.0, min(1.0, x)), "y": max(0.0, min(1.0, y)), "visible": visible}
-    # Broadcast to the room except the sender
-    await sio.emit("cursor", payload, room=room, skip_sid=sid)
+    await cursor_handler(sio, sid, data, sid_index)
 
 
 @sio.event
 async def disconnect(sid):
-    info = sid_index.pop(sid, None)
-    if not info:
-        return
-    room = info.get("room")
-    pid = info.get("pid")
-    r = rooms.get(room)
-    if not r:
-        return
-    if r["seats"].get(pid) == sid:
-        r["seats"][pid] = None
+    await disconnect_handler(sid, rooms, sid_index)
 
 
 @sio.event
 async def draw(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r:
-        return
-    st: GameState = r["state"]
-    if not st.deck:
-        # Перетасовать полку в колоду, если есть
-        if st.shelf:
-            random.shuffle(st.shelf)
-            st.deck.extend(st.shelf)
-            st.shelf.clear()
-    if not st.deck:
-        await sio.emit("error", {"msg": "deck_empty"}, to=sid)
-        return
-    card = st.deck.pop(0)
-    st.players[pid].hand.append(card)
-    _log(room, "draw", f"{pid} drew a card", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await draw_handler(sio, sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def move_card(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r:
-        return
-    st: GameState = r["state"]
-    from_zone = data.get("from")
-    to_zone = data.get("to")
-    from_index = data.get("fromIndex")
-    to_index = data.get("toIndex")
+    async def emit(room_id: str):
+        await _emit_views(room_id)
 
-    p = st.players[pid]
-    if from_zone == "hand" and to_zone == "slot":
-        try:
-            card = p.hand.pop(int(from_index))
-        except Exception:
-            return
-        si = int(to_index)
-        if si < 0 or si >= len(p.slots):
-            p.hand.append(card)
-            return
-        slot = p.slots[si]
-        if slot.card is None:
-            slot.card = card
-            slot.face_up = True
-            _log(room, "play", f"{pid} played {card.name} to slot {si+1}", actor=pid)
-        else:
-            # обмен
-            p.hand.append(slot.card)
-            slot.card = card
-            slot.face_up = True
-            _log(room, "swap", f"{pid} swapped card into slot {si+1}", actor=pid)
-    elif from_zone == "slot" and to_zone == "hand":
-        si = int(from_index)
-        if si < 0 or si >= len(p.slots):
-            return
-        slot = p.slots[si]
-        if slot.card is None:
-            return
-        card = slot.card
-        p.hand.append(card)
-        slot.card = None
-        slot.muscles = 0
-        _log(room, "pickup", f"{pid} picked up {card.name} from slot {si+1}", actor=pid)
-    elif from_zone == "slot" and to_zone == "slot":
-        si = int(from_index)
-        di = int(to_index)
-        if si < 0 or si >= len(p.slots) or di < 0 or di >= len(p.slots):
-            return
-        s_from = p.slots[si]
-        s_to = p.slots[di]
-        s_from.card, s_to.card = s_to.card, s_from.card
-        s_from.face_up = True if s_from.card else s_from.face_up
-        s_to.face_up = True if s_to.card else s_to.face_up
-        _log(room, "rearrange", f"{pid} rearranged slots {si+1} ⇄ {di+1}", actor=pid)
-    elif to_zone == "discard":
-        # Перенос в общий отбой (вне игры)
-        if from_zone == "hand":
-            try:
-                card = p.hand.pop(int(from_index))
-            except Exception:
-                return
-            st.discard_out_of_game.append(card)
-            _log(room, "discard", f"{pid} discarded {card.name} to Discard pile", actor=pid)
-        elif from_zone == "slot":
-            si = int(from_index)
-            if si < 0 or si >= len(p.slots):
-                return
-            slot = p.slots[si]
-            if slot.card is None:
-                return
-            card = slot.card
-            st.discard_out_of_game.append(card)
-            slot.card = None
-            slot.muscles = 0
-            _log(room, "discard", f"{pid} discarded {card.name} from slot {si+1} to Discard pile", actor=pid)
-    elif to_zone == "shelf":
-        # Полка (временное откладывание карт, могут вернуться в игру)
-        if from_zone == "hand":
-            try:
-                card = p.hand.pop(int(from_index))
-            except Exception:
-                return
-            st.shelf.append(card)
-            _log(room, "shelve", f"{pid} placed {card.name} on Reserve pile", actor=pid)
-        elif from_zone == "slot":
-            si = int(from_index)
-            if si < 0 or si >= len(p.slots):
-                return
-            slot = p.slots[si]
-            if slot.card is None:
-                return
-            card = slot.card
-            st.shelf.append(card)
-            slot.card = None
-            slot.muscles = 0
-            _log(room, "shelve", f"{pid} moved {card.name} from slot {si+1} to Reserve pile", actor=pid)
-    elif from_zone == "shelf" and to_zone == "hand":
-        # Взять карту с полки в руку
-        if pid != st.active_player:
-            await sio.emit("error", {"msg": "not_your_turn"}, to=sid)
-            return
-        try:
-            idx = int(from_index)
-            if idx < 0 or idx >= len(st.shelf):
-                return
-        except Exception:
-            return
-        card = st.shelf.pop(idx)
-        p.hand.append(card)
-        _log(room, "unshelve", f"{pid} took {card.name} from Reserve pile to hand", actor=pid)
-    elif from_zone == "shelf" and to_zone == "slot":
-        # Положить карту с полки на пустой слот
-        if pid != st.active_player:
-            await sio.emit("error", {"msg": "not_your_turn"}, to=sid)
-            return
-        try:
-            idx = int(from_index)
-            si = int(to_index)
-        except Exception:
-            return
-        if idx < 0 or idx >= len(st.shelf) or si < 0 or si >= len(p.slots):
-            return
-        slot = p.slots[si]
-        if slot.card is not None:
-            # Не кладём поверх занятых слотов
-            return
-        card = st.shelf.pop(idx)
-        slot.card = card
-        slot.face_up = True
-        _log(room, "unshelve", f"{pid} played {card.name} from shelf to slot {si+1}", actor=pid)
-    else:
-        # Неподдерживаемая комбинация
-        return
-    await _emit_views(room)
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await move_card_handler(sio, sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
@@ -903,139 +313,83 @@ async def end_turn(sid, data):
 
 @sio.event
 async def flip_card(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    si = int(data.get("slotIndex", -1))
-    if si < 0 or si >= len(st.players[pid].slots):
-        return
-    slot = st.players[pid].slots[si]
-    if slot.card is None:
-        return
-    slot.face_up = not slot.face_up
-    name = slot.card.name if slot.card else "Card"
-    _log(room, "flip", f"{pid} flipped {name} {'up' if slot.face_up else 'down'}", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await flip_card_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def add_token(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    kind = (data.get("kind") or "shield").lower()
-    count = int(data.get("count", 1))
-    if kind == "shield":
-        si = int(data.get("slotIndex", -1))
-        if 0 <= si < len(st.players[pid].slots):
-            st.players[pid].slots[si].muscles += max(0, count)
-            _log(room, "token", f"{pid} +{max(0, count)} shield on slot {si+1}", actor=pid)
-    elif kind == "money":
-        st.players[pid].tokens.reserve_money += max(0, count)
-        _log(room, "token", f"{pid} +{max(0, count)} money", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await add_token_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def remove_token(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    kind = (data.get("kind") or "shield").lower()
-    count = int(data.get("count", 1))
-    if kind == "shield":
-        si = int(data.get("slotIndex", -1))
-        if 0 <= si < len(st.players[pid].slots):
-            st.players[pid].slots[si].muscles = max(0, st.players[pid].slots[si].muscles - max(0, count))
-            _log(room, "token", f"{pid} -{max(0, count)} shield on slot {si+1}", actor=pid)
-    elif kind == "money":
-        st.players[pid].tokens.reserve_money = max(0, st.players[pid].tokens.reserve_money - max(0, count))
-        _log(room, "token", f"{pid} -{max(0, count)} money", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await remove_token_handler(sid, data, rooms, sid_index, log_fn=log, emit_views_fn=emit)
 
 
 @sio.event
 async def shuffle_deck(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    st: GameState = rooms.get(room, {}).get("state")
-    if not st:
-        return
-    random.shuffle(st.deck)
-    _log(room, "shuffle", "Deck shuffled")
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg)
+
+    await shuffle_deck_handler(sid, rooms, sid_index, emit_views_fn=emit, log_fn=log)
 
 
 @sio.event
 async def set_visible_slots(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    pid = info["pid"]
-    r = rooms.get(room)
-    if not r:
-        return
-    n = int(data.get("count", INIT_VISIBLE_SLOTS))
-    n = max(6, min(MAX_SLOTS, n))
-    r.setdefault("visible_slots", {"P1": INIT_VISIBLE_SLOTS, "P2": INIT_VISIBLE_SLOTS})
-    r["visible_slots"][pid] = n
-    _log(room, "ui", f"{pid} set visible slots to {n}", actor=pid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg, actor=sid_index.get(sid, {}).get("pid"))
+
+    await set_visible_slots_handler(
+        sid,
+        data,
+        rooms,
+        sid_index,
+        INIT_VISIBLE_SLOTS=INIT_VISIBLE_SLOTS,
+        MAX_SLOTS=MAX_SLOTS,
+        log_fn=log,
+        emit_views_fn=emit,
+    )
 
 
 @sio.event
 async def reset_room(sid, data):
-    info = sid_index.get(sid)
-    if not info:
-        return
-    room = info["room"]
-    r = rooms.get(room)
-    if not r:
-        return
-    # Optionally override room source if provided by requester
-    try:
-        req_source = (data.get("source") or "").lower()
-    except Exception:
-        req_source = ""
-    if req_source in {"yaml", "csv"}:
-        r["source"] = req_source
-    # Rebuild state based on the (possibly updated) room's source
-    # Always use CSV as the single source of truth for card data
-    state, cfg = _build_state_from_csv()
-    # Preserve seats but reset state and visibility
-    r["state"] = state
-    r["cfg"] = cfg
-    r["visible_slots"] = {"P1": INIT_VISIBLE_SLOTS, "P2": INIT_VISIBLE_SLOTS}
-    r.setdefault("log", []).clear()
-    # Debug: log and print deck/shelf sizes after reset
-    try:
-        print(f"[ROOM {room}] After reset: shelf={len(state.shelf)}, deck={len(state.deck)}")
-    except Exception:
-        pass
-    _log(room, "load", f"After reset: shelf={len(state.shelf)}, deck={len(state.deck)}")
-    _log(room, "reset", f"Room reset (source={r.get('source', 'csv').upper()})")
-    _log(room, "turn_start", f"Game started. Active: {state.active_player} · Turn {state.turn_number}")
-    # Re-emit 'joined' meta so clients refresh any cached UI derived from it
-    seats = r.get("seats", {})
-    for pid, psid in seats.items():
-        if psid:
-            await sio.emit("joined", {"room": room, "seat": pid, "source": r.get("source", "yaml"), "visibleSlots": r["visible_slots"][pid]}, to=psid)
-    await _emit_views(room)
+    async def emit(room_id: str):
+        await _emit_views(room_id)
+
+    def log(room_id: str, kind: str, msg: str):
+        _log(room_id, kind, msg)
+
+    await reset_room_handler(
+        sio,
+        sid,
+        data,
+        rooms,
+        sid_index,
+        build_state_cb=_build_state_from_csv,
+        emit_views_fn=emit,
+        log_fn=log,
+    )

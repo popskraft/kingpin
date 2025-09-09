@@ -83,17 +83,10 @@ class TestCard:
         card = Card(**card_data)
         assert card.faction == "government"  # исправлено
     
-    def test_card_clan_caste_compatibility(self):
-        """Тест совместимости clan и caste полей"""
-        # Только clan
-        card1 = Card(id="test1", name="Test1", clan="warriors")
-        assert card1.clan == "warriors"
-        assert card1.caste == "warriors"  # автозаполнение
-        
-        # Только caste (legacy)
-        card2 = Card(id="test2", name="Test2", caste="merchants")
-        assert card2.caste == "merchants"
-        assert card2.clan == "merchants"  # автозаполнение
+    def test_card_clan_field_only(self):
+        """Тест поля clan (legacy 'caste' больше не поддерживается)."""
+        card = Card(id="test1", name="Test1", clan="warriors")
+        assert card.clan == "warriors"
 
 
 class TestSlot:

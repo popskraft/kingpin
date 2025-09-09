@@ -83,11 +83,11 @@ def main():
         
         # Выводим краткие результаты
         print(f"\n🏆 РЕЗУЛЬТАТЫ ТУРНИРА:")
-        caste_stats = tournament_data['caste_statistics']
-        sorted_castes = sorted(caste_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
+        clan_stats = tournament_data['clan_statistics']
+        sorted_clans = sorted(clan_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
         
-        for i, (caste, stats) in enumerate(sorted_castes, 1):
-            print(f"{i}. {caste.upper()}: {stats['win_rate']:.1f}% винрейт ({stats['wins']}/{stats['games']})")
+        for i, (clan, stats) in enumerate(sorted_clans, 1):
+            print(f"{i}. {clan.upper()}: {stats['win_rate']:.1f}% винрейт ({stats['wins']}/{stats['games']})")
         
         print(f"\n📈 Всего игр: {tournament_data['total_games']}")
         
@@ -112,7 +112,7 @@ def main():
     
     # Анализ баланса
     if args.mode == 'tournament':
-        win_rates = [stats['win_rate'] for stats in caste_stats.values()]
+        win_rates = [stats['win_rate'] for stats in clan_stats.values()]
         balance_gap = max(win_rates) - min(win_rates)
         
         print(f"\n⚖️ АНАЛИЗ БАЛАНСА:")

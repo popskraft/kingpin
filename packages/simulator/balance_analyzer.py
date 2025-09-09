@@ -14,7 +14,7 @@ class Card:
     id: str
     name: str
     type: str
-    caste: str
+    clan: str
     faction: str
     hp: float
     atk: float
@@ -32,7 +32,7 @@ class BalanceAnalyzer:
     
     def __init__(self, cards_file: str):
         self.cards = self._load_cards(cards_file)
-        self.castes = ['gangsters', 'authorities', 'loners', 'solo']
+        self.clans = ['gangsters', 'authorities', 'loners', 'solo']
         
     def _load_cards(self, filename: str) -> List[Card]:
         """Загружает карты из CSV файла"""
@@ -50,14 +50,14 @@ class BalanceAnalyzer:
                 independence = self._parse_numeric(row['Independence'])
                 in_deck = row['В_колоде'] == '✓'
                 
-                # Prefer new header 'Клан', fallback to legacy 'Каста'
-                clan_value = row.get('Клан') or row.get('Каста') or ''
+                # Use English header 'Clan' (unified data)
+                clan_value = row.get('Clan') or ''
 
                 card = Card(
                     id=row['ID'],
                     name=row['Название'],
                     type=row['Тип'],
-                    caste=clan_value,
+                    clan=clan_value,
                     faction=row['Фракция'],
                     hp=hp,
                     atk=atk,
@@ -207,8 +207,8 @@ class BalanceAnalyzer:
         """
         caste_stats = {}
         
-        for caste in self.castes:
-            caste_cards = [c for c in self.cards if c.caste == caste and c.in_deck and c.type != 'boss']
+        for clan in ['gangsters', 'authorities', 'loners', 'solo']:
+            caste_cards = [c for c in self.cards if getattr(c, 'clan', '') == clan and c.in_deck and c.type != 'boss']
             
             if not caste_cards:
                 continue
@@ -233,7 +233,7 @@ class BalanceAnalyzer:
                 if card.faction != 'n/a':
                     faction_distribution[card.faction] += 1
             
-            caste_stats[caste] = {
+            caste_stats[clan] = {
                 'card_count': total_cards,
                 'avg_hp': avg_hp,
                 'avg_atk': avg_atk,
@@ -294,12 +294,12 @@ class BalanceAnalyzer:
         report += "## Анализ по кланам\n\n"
         
         # Сортировка кланов по общему рейтингу
-        sorted_castes = sorted(caste_stats.items(), 
+        sorted_clans = sorted(caste_stats.items(), 
                              key=lambda x: x[1]['avg_overall_rating'], 
                              reverse=True)
         
-        for caste, stats in sorted_castes:
-            report += f"### {caste.upper()}\n"
+        for clan, stats in sorted_clans:
+            report += f"### {clan.upper()}\n"
             report += f"- **Количество карт**: {stats['card_count']}\n"
             report += f"- **Средний HP**: {stats['avg_hp']:.1f}\n"
             report += f"- **Средний ATK**: {stats['avg_atk']:.1f}\n"
@@ -337,11 +337,11 @@ class BalanceAnalyzer:
                 report += "✅ **ХОРОШИЙ БАЛАНС** - кланы примерно равны\n"
             
             # Конкретные рекомендации
-            weakest_caste = min(sorted_castes, key=lambda x: x[1]['avg_overall_rating'])
-            strongest_caste = max(sorted_castes, key=lambda x: x[1]['avg_overall_rating'])
+            weakest_clan = min(sorted_clans, key=lambda x: x[1]['avg_overall_rating'])
+            strongest_clan = max(sorted_clans, key=lambda x: x[1]['avg_overall_rating'])
             
-            report += f"\n**Самый слабый клан**: {weakest_caste[0]} ({weakest_caste[1]['avg_overall_rating']:.2f})\n"
-            report += f"**Самый сильный клан**: {strongest_caste[0]} ({strongest_caste[1]['avg_overall_rating']:.2f})\n"
+            report += f"\n**Самый слабый клан**: {weakest_clan[0]} ({weakest_clan[1]['avg_overall_rating']:.2f})\n"
+            report += f"**Самый сильный клан**: {strongest_clan[0]} ({strongest_clan[1]['avg_overall_rating']:.2f})\n"
         
         return report
     

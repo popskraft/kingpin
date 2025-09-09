@@ -19,7 +19,7 @@ Destroy opponent's Boss by reducing its HP to 0 or below.
 
 > Card Data Note
 >
-> Single source of truth for all cards is `config/cards.csv` file. The `docs/cards.csv` file has been removed and is no longer used.
+> Single source of truth for all cards is `config/cards.csv` (English headers). Use `Clan` for clan assignment; legacy terms like “Caste” are no longer used.
 
 ### 1.1 Game Zones
 - **Player Board**: 6 slots for cards in play (face up)
@@ -59,7 +59,7 @@ Total: 37 cards in deck (+ 3 Bosses outside deck).
 - **Corruption**: bribery cost = Corruption (spent from safe)
 - **HP**: health points (card destroyed when HP ≤ 0)
 - **Attack**: damage when attacking
-- **Clan**: clan (gangsters, authorities, loners) - intra-clan synergies
+- **Clan**: clan (gangsters, authorities, loners) — intra-clan synergies
 - **Faction**: faction (heads, specialists, stormers, slippery) - cross-clan synergies
 - **Defend (D)**: base shield limit (🛡️) for this card. Effective shield limit = `min(4, D + Authority_auras)`.
 - **Rage**: per-card attack aura. Adds +R ATK to every attacking card you control (i.e., a combined attack of N cards gets +N×R). Stacks across multiple sources.

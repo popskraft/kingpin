@@ -59,8 +59,8 @@ class GameCard:
         return self.engine_card.name
     
     @property
-    def caste(self) -> str:
-        return self.engine_card.caste or ''
+    def clan(self) -> str:
+        return self.engine_card.clan or ''
     
     @property
     def faction(self) -> str:
@@ -115,7 +115,7 @@ class GameCard:
 @dataclass
 class Player:
     name: str
-    caste: str
+    clan: str
     deck: List[GameCard]
     hand: List[GameCard] = dataclass_field(default_factory=list)
     field: List[GameCard] = dataclass_field(default_factory=list)
@@ -173,10 +173,10 @@ class GameState:
 class GameSimulator:
     def __init__(self, cards_file: str):
         self.cards_data = self.load_cards_from_csv(cards_file)
-        self.castes = ['gangsters', 'authorities', 'loners', 'solo']
+        self.clans = ['gangsters', 'authorities', 'loners', 'solo']
         
     def load_cards_from_csv(self, csv_file: str) -> Dict[str, List[GameCard]]:
-        """Load cards from CSV using unified engine loader and organize by caste"""
+        """Load cards from CSV using unified engine loader and organize by clan"""
         cards_by_caste = {
             'gangsters': [],
             'authorities': [],
@@ -189,24 +189,24 @@ class GameSimulator:
         
         for engine_card in engine_cards:
             game_card = GameCard.from_engine_card(engine_card)
-            caste = game_card.caste.lower()
-            if caste in cards_by_caste:
-                cards_by_caste[caste].append(game_card)
-            elif caste == '':
-                # Handle cards without caste as solo
+            clan = (getattr(game_card, 'clan', '') or '').lower()
+            if clan in cards_by_caste:
+                cards_by_caste[clan].append(game_card)
+            elif clan == '':
+                # Handle cards without clan as solo
                 cards_by_caste['solo'].append(game_card)
         
         return cards_by_caste
 
-    def create_deck(self, caste: str, deck_size: int = 8) -> List[GameCard]:
-        """Создает колоду для указанной касты"""
-        caste_cards = [card for card in self.cards_data[caste] if card.caste == caste]
+    def create_deck(self, clan: str, deck_size: int = 8) -> List[GameCard]:
+        """Создает колоду для указанного клана"""
+        clan_cards = [card for card in self.cards_data[clan] if getattr(card, 'clan', '') == clan]
         
-        # Берем все доступные карты касты или случайную выборку
-        if len(caste_cards) <= deck_size:
-            deck = copy.deepcopy(caste_cards)
+        # Берем все доступные карты клана или случайную выборку
+        if len(clan_cards) <= deck_size:
+            deck = copy.deepcopy(clan_cards)
         else:
-            deck = copy.deepcopy(random.sample(caste_cards, deck_size))
+            deck = copy.deepcopy(random.sample(clan_cards, deck_size))
         
         # Перемешиваем колоду
         random.shuffle(deck)
@@ -323,13 +323,13 @@ class GameSimulator:
         
         return False
     
-    def simulate_game(self, caste1: str, caste2: str) -> Dict[str, Any]:
-        """Симулирует одну игру между двумя кастами"""
-        deck1 = self.create_deck(caste1)
-        deck2 = self.create_deck(caste2)
+    def simulate_game(self, clan1: str, clan2: str) -> Dict[str, Any]:
+        """Симулирует одну игру между двумя кланами"""
+        deck1 = self.create_deck(clan1)
+        deck2 = self.create_deck(clan2)
         
-        player1 = Player(name=f"Player_{caste1}", caste=caste1, deck=deck1)
-        player2 = Player(name=f"Player_{caste2}", caste=caste2, deck=deck2)
+        player1 = Player(name=f"Player_{clan1}", clan=clan1, deck=deck1)
+        player2 = Player(name=f"Player_{clan2}", clan=clan2, deck=deck2)
         
         # Начальная раздача
         for _ in range(3):
@@ -347,41 +347,41 @@ class GameSimulator:
         return {
             'winner': game_state.winner,
             'turns': game_state.turn,
-            'caste1': caste1,
-            'caste2': caste2,
+            'clan1': clan1,
+            'clan2': clan2,
             'p1_cards_played': len(player1.graveyard) + len(player1.field),
             'p2_cards_played': len(player2.graveyard) + len(player2.field),
             'p1_final_field': len(player1.field),
             'p2_final_field': len(player2.field)
         }
     
-    def run_matchup_simulation(self, caste1: str, caste2: str, games: int = 100) -> Dict[str, Any]:
-        """Запускает серию игр между двумя кастами"""
+    def run_matchup_simulation(self, clan1: str, clan2: str, games: int = 100) -> Dict[str, Any]:
+        """Запускает серию игр между двумя кланами"""
         results = []
-        wins = {caste1: 0, caste2: 0, 'Draw': 0}
+        wins = {clan1: 0, clan2: 0, 'Draw': 0}
         total_turns = 0
         
         for _ in range(games):
-            result = self.simulate_game(caste1, caste2)
+            result = self.simulate_game(clan1, clan2)
             results.append(result)
             
-            if result['winner'] == f"Player_{caste1}":
-                wins[caste1] += 1
-            elif result['winner'] == f"Player_{caste2}":
-                wins[caste2] += 1
+            if result['winner'] == f"Player_{clan1}":
+                wins[clan1] += 1
+            elif result['winner'] == f"Player_{clan2}":
+                wins[clan2] += 1
             else:
                 wins['Draw'] += 1
             
             total_turns += result['turns']
         
         return {
-            'caste1': caste1,
-            'caste2': caste2,
+            'clan1': clan1,
+            'clan2': clan2,
             'games_played': games,
             'wins': wins,
             'win_rates': {
-                caste1: wins[caste1] / games * 100,
-                caste2: wins[caste2] / games * 100,
+                clan1: wins[clan1] / games * 100,
+                clan2: wins[clan2] / games * 100,
                 'Draw': wins['Draw'] / games * 100
             },
             'avg_game_length': total_turns / games,
@@ -389,32 +389,32 @@ class GameSimulator:
         }
     
     def run_full_tournament(self, games_per_matchup: int = 50) -> Dict[str, Any]:
-        """Запускает полный турнир между всеми кастами"""
+        """Запускает полный турнир между всеми кланами"""
         tournament_results = {}
-        caste_stats = {caste: {'wins': 0, 'losses': 0, 'draws': 0, 'games': 0} for caste in self.castes}
+        clan_stats = {clan: {'wins': 0, 'losses': 0, 'draws': 0, 'games': 0} for clan in self.clans}
         
         # Все возможные матчапы
-        for i, caste1 in enumerate(self.castes):
-            for j, caste2 in enumerate(self.castes):
+        for i, clan1 in enumerate(self.clans):
+            for j, clan2 in enumerate(self.clans):
                 if i < j:  # Избегаем дублирования матчапов
-                    matchup_key = f"{caste1}_vs_{caste2}"
-                    result = self.run_matchup_simulation(caste1, caste2, games_per_matchup)
+                    matchup_key = f"{clan1}_vs_{clan2}"
+                    result = self.run_matchup_simulation(clan1, clan2, games_per_matchup)
                     tournament_results[matchup_key] = result
                     
-                    # Обновляем статистику кастов
-                    caste_stats[caste1]['wins'] += result['wins'][caste1]
-                    caste_stats[caste1]['losses'] += result['wins'][caste2]
-                    caste_stats[caste1]['draws'] += result['wins']['Draw']
-                    caste_stats[caste1]['games'] += games_per_matchup
+                    # Обновляем статистику кланов
+                    clan_stats[clan1]['wins'] += result['wins'][clan1]
+                    clan_stats[clan1]['losses'] += result['wins'][clan2]
+                    clan_stats[clan1]['draws'] += result['wins']['Draw']
+                    clan_stats[clan1]['games'] += games_per_matchup
                     
-                    caste_stats[caste2]['wins'] += result['wins'][caste2]
-                    caste_stats[caste2]['losses'] += result['wins'][caste1]
-                    caste_stats[caste2]['draws'] += result['wins']['Draw']
-                    caste_stats[caste2]['games'] += games_per_matchup
+                    clan_stats[clan2]['wins'] += result['wins'][clan2]
+                    clan_stats[clan2]['losses'] += result['wins'][clan1]
+                    clan_stats[clan2]['draws'] += result['wins']['Draw']
+                    clan_stats[clan2]['games'] += games_per_matchup
         
         # Вычисляем общие винрейты
-        for caste in self.castes:
-            stats = caste_stats[caste]
+        for clan in self.clans:
+            stats = clan_stats[clan]
             if stats['games'] > 0:
                 stats['win_rate'] = stats['wins'] / stats['games'] * 100
                 stats['loss_rate'] = stats['losses'] / stats['games'] * 100
@@ -422,7 +422,7 @@ class GameSimulator:
         
         return {
             'tournament_results': tournament_results,
-            'caste_statistics': caste_stats,
+            'clan_statistics': clan_stats,
             'games_per_matchup': games_per_matchup,
             'total_games': len(tournament_results) * games_per_matchup
         }
@@ -431,7 +431,7 @@ class GameSimulator:
         """Генерирует отчет по результатам симуляции"""
         report = "# ОТЧЕТ ПО ИГРОВОЙ СИМУЛЯЦИИ KINGPIN\n\n"
         
-        caste_stats = tournament_data['caste_statistics']
+        clan_stats = tournament_data['clan_statistics']
         games_per_matchup = tournament_data['games_per_matchup']
         
         report += f"**Общая информация:**\n"
@@ -440,11 +440,11 @@ class GameSimulator:
         report += f"- Матчапов: {len(tournament_data['tournament_results'])}\n\n"
         
         # Общий рейтинг кланов по винрейту
-        sorted_castes = sorted(caste_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
+        sorted_clans = sorted(clan_stats.items(), key=lambda x: x[1]['win_rate'], reverse=True)
         
         report += "## Общий рейтинг кланов\n\n"
-        for i, (caste, stats) in enumerate(sorted_castes, 1):
-            report += f"{i}. **{caste.upper()}**\n"
+        for i, (clan, stats) in enumerate(sorted_clans, 1):
+            report += f"{i}. **{clan.upper()}**\n"
             report += f"   - Винрейт: {stats['win_rate']:.1f}%\n"
             report += f"   - Побед: {stats['wins']}/{stats['games']}\n"
             report += f"   - Поражений: {stats['losses']}/{stats['games']}\n"
@@ -454,16 +454,16 @@ class GameSimulator:
         report += "## Детальные результаты матчапов\n\n"
         
         for matchup_key, result in tournament_data['tournament_results'].items():
-            caste1, caste2 = result['caste1'], result['caste2']
-            report += f"### {caste1.upper()} vs {caste2.upper()}\n"
-            report += f"- **{caste1}**: {result['win_rates'][caste1]:.1f}% ({result['wins'][caste1]} побед)\n"
-            report += f"- **{caste2}**: {result['win_rates'][caste2]:.1f}% ({result['wins'][caste2]} побед)\n"
+            clan1, clan2 = result['clan1'], result['clan2']
+            report += f"### {clan1.upper()} vs {clan2.upper()}\n"
+            report += f"- **{clan1}**: {result['win_rates'][clan1]:.1f}% ({result['wins'][clan1]} побед)\n"
+            report += f"- **{clan2}**: {result['win_rates'][clan2]:.1f}% ({result['wins'][clan2]} побед)\n"
             report += f"- **Ничьи**: {result['win_rates']['Draw']:.1f}% ({result['wins']['Draw']})\n"
             report += f"- Средняя длина игры: {result['avg_game_length']:.1f} ходов\n\n"
         
         # Анализ баланса
         report += "## Анализ баланса\n\n"
-        win_rates = [stats['win_rate'] for stats in caste_stats.values()]
+        win_rates = [stats['win_rate'] for stats in clan_stats.values()]
         max_wr = max(win_rates)
         min_wr = min(win_rates)
         balance_gap = max_wr - min_wr
@@ -477,8 +477,8 @@ class GameSimulator:
         else:
             report += "✅ **ХОРОШИЙ БАЛАНС** - разрыв менее 10%\n"
         
-        strongest_caste = max(sorted_castes, key=lambda x: x[1]['win_rate'])
-        weakest_caste = min(sorted_castes, key=lambda x: x[1]['win_rate'])
+        strongest_caste = max(sorted_clans, key=lambda x: x[1]['win_rate'])
+        weakest_caste = min(sorted_clans, key=lambda x: x[1]['win_rate'])
         
         report += f"\n**Самый сильный клан**: {strongest_caste[0]} ({strongest_caste[1]['win_rate']:.1f}%)\n"
         report += f"**Самый слабый клан**: {weakest_caste[0]} ({weakest_caste[1]['win_rate']:.1f}%)\n"

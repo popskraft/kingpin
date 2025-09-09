@@ -1,5 +1,23 @@
 # KINGPIN — тестовая среда карточной дуэльной игры
 
+## Структура репозитория (сжатая)
+
+- `packages/engine` — Python-движок (модели, правила, загрузчик CSV/YAML)
+- `packages/server` — FastAPI + Socket.IO сервер (ASGI)
+- `packages/simulator` — симулятор матчей и анализ баланса
+- `webapp-2p` — фронтенд на React+Vite
+- `config/` — конфигурации и `cards.csv` (единственный источник карточных данных)
+- `docs/` — документация (структурирована):
+  - `docs/rules.md` — правила игры
+  - `docs/ai/` — инструкции для AI-агентов (тестирование)
+  - `docs/analysis/` — аналитика и отчёты по качеству
+  - `docs/reports/` — итоговые отчёты симуляций/баланса
+  - `docs/architecture/` — архитектурные заметки
+- `scripts/` — служебные утилиты и анализаторы
+- `tests/` — unit-тесты
+
+Полная схема папок и ссылки на ключевые документы приведены ниже.
+
 ## Структура проекта
 
 - **packages/engine** — Python-движок (data-driven), загрузка правил из YAML
@@ -192,3 +210,18 @@ VITE_ROOM=demo
 ## Лицензия
 
 WIP (определить позже).
+
+## Полезные ссылки
+
+- Правила игры: `docs/rules.md`
+- Руководство для AI-агента: `docs/ai/agent_testing.md`
+- Интеграция тестов для AI: `docs/ai/ai-testing-integration.md`
+- Анализ качества кода: `docs/analysis/code-quality-analysis.md`
+- План рефакторинга сервера: `docs/architecture/server-refactor-plan.md`
+- Отчёт по симуляции турнира: `docs/reports/tournament-simulation-report.md`
+
+## Материалы для AI-агентов
+
+См. единый справочник по тестированию и рабочему процессу для ИИ:
+
+`docs/ai/agent_testing.md`

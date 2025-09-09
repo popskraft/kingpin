@@ -43,7 +43,7 @@ function getClanIcon(clan?: string): string | null {
 
 function getClanStripeClass(card: Card): string {
   // Determine stripe color by clan (priority) or faction
-  const clanRaw = (((card.clan) || (card as any)?.caste || '') as string).toLowerCase()
+  const clanRaw = ((card.clan || '') as string).toLowerCase()
   const factionRaw = (card.faction || '').toLowerCase()
   
   // Clans have priority over factions
@@ -98,9 +98,9 @@ function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo 
       {clanStripeClass ? <div className={`clan-stripe ${clanStripeClass}`} title={`Clan/Faction: ${clanStripeClass}`} /> : null}
       {hasActivePair && stripeClan ? <div className={`synergy-stripe ${stripeClan}`} title={`Pair synergy: ${stripeClan}`} /> : null}
       <div className="card-title">
-        {(((card.clan) || (card as any)?.caste) ? (
-          <span className="clan-icon" title={`Clan: ${((card.clan) || (card as any)?.caste)}`}>
-            {getClanIcon(((card.clan) || (card as any)?.caste) as string) }
+        {(card.clan ? (
+          <span className="clan-icon" title={`Clan: ${card.clan}`}>
+            {getClanIcon(card.clan as string) }
           </span>
         ) : null)}
         {card.name}
@@ -333,7 +333,8 @@ export default function App(): JSX.Element {
   }, [seat])
 
   useEffect(() => {
-    const s = io(SERVER_URL, { transports: ['websocket'] })
+    // Allow both websocket and polling to avoid connection issues in dev/proxy environments
+    const s = io(SERVER_URL)
     setSocket(s)
 
     s.on('connect', () => {
@@ -410,7 +411,7 @@ export default function App(): JSX.Element {
   // --- Synergy helpers (generic) ---
   const detectClanSynergyKey = (sideBoard?: Slot[]): 'gangsters' | 'authorities' | 'loners' | null => {
     const clans = (sideBoard || [])
-      .map(sl => ((((sl.card?.clan) || (sl.card as any)?.caste || '') as string).toLowerCase().trim()))
+      .map(sl => (((sl.card?.clan || '') as string).toLowerCase().trim()))
       .filter(Boolean)
     if (clans.length === 0) return null
     const uniq = Array.from(new Set(clans))
@@ -438,9 +439,9 @@ export default function App(): JSX.Element {
   const hasPairSynergyForCard = (sideBoard?: Slot[], card?: Card | null): boolean => {
     if (!card) return false
     const board = sideBoard || []
-    const cardClan = ((((card.clan) || (card as any)?.caste || '') as string).trim().toLowerCase())
+    const cardClan = (((card.clan || '') as string).trim().toLowerCase())
     const cardFaction = (card.faction || '').trim()
-    const sameClan = board.filter(sl => ((((sl.card?.clan) || (sl.card as any)?.caste || '') as string).trim().toLowerCase()) === cardClan).length >= 2
+    const sameClan = board.filter(sl => ((((sl.card?.clan || '') as string).trim().toLowerCase()) === cardClan)).length >= 2
     const sameFaction = board.filter(sl => (sl.card?.faction || '').trim() === cardFaction).length >= 2
     return sameClan || sameFaction
   }
@@ -470,7 +471,7 @@ export default function App(): JSX.Element {
   // --- Synergy Systems (Your side) ---
   const yourClanSynergy = useMemo(() => {
     const clans = (you?.board ?? [])
-      .map(sl => (((sl.card?.clan) || (sl.card as any)?.caste || '') as string).toLowerCase().trim())
+      .map(sl => (((sl.card?.clan || '') as string).toLowerCase().trim()))
       .filter(Boolean)
     if (clans.length === 0) return null as null | { name: string, effect: string }
     const unique = Array.from(new Set(clans))
@@ -935,7 +936,7 @@ export default function App(): JSX.Element {
                   {view?.shared?.shelf?.map((c, i) => (
                     <div key={c.id + '_' + i} className="shelf-item" draggable onDragStart={(e: React.DragEvent<HTMLDivElement>) => onShelfDragStart(i, e)} onDragEnd={() => setDragCardFrom(null)} title={c.notes || c.name} onMouseEnter={() => handlePreviewHoverStart(c, true)} onMouseLeave={handlePreviewHoverEnd}>
                       <div className="shelf-card-name">{c.name}</div>
-                  {(c.clan || (c as any)?.caste) && <div className="shelf-card-clan">{c.clan || (c as any)?.caste}</div>}
+                  {c.clan && <div className="shelf-card-clan">{c.clan}</div>}
                       {c.faction && <div className="shelf-card-faction">{c.faction}</div>}
                       {(c.rage ?? 0) > 0 && (
                     <div className="card-row card-stats shelf-stats">
@@ -995,7 +996,7 @@ export default function App(): JSX.Element {
             <div className="preview-props">
               <div className="prop"><b>Type:</b> {preview.card.type || '—'}</div>
               <div className="prop"><b>Faction:</b> {preview.card.faction || '—'}</div>
-              <div className="prop"><b>Clan:</b> {(preview.card.clan || (preview.card as any)?.caste) || '—'}</div>
+              <div className="prop"><b>Clan:</b> {preview.card.clan || '—'}</div>
               {(() => {
                 const b = preview.owner === 'you' ? you?.board : preview.owner === 'opponent' ? opp?.board : undefined
                 const pair = synergyBonusesForCardPair(b, preview.card)
