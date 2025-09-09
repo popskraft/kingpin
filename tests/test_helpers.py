@@ -148,7 +148,7 @@ class TestDataBuilder:
             active_player=active_player,
             phase=phase,
             turn_number=turn_number,
-            flags={}
+            flags={"micro_bribe_used": False}
         )
     
     @staticmethod

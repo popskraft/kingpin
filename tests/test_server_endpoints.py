@@ -18,8 +18,8 @@ class TestServerHelpers:
     
     def test_build_state_from_csv(self):
         """Тест построения состояния из CSV"""
-        # Mock the file reading
-        with patch('packages.server.main.load_game') as mock_load_game:
+        # Mock the file reading in services module
+        with patch('packages.server.services.setup.load_game') as mock_load_game:
             # Создаём тестовое состояние
             test_state = TestDataBuilder.create_game_state()
             test_config = {"hand_limit": 6}
@@ -554,8 +554,11 @@ class TestSocketIOEvents:
         with patch('packages.server.main.sio', mock_sio):
             await draw("nonexistent_sid", {})
         
-        # Никаких событий не должно быть отправлено
-        assert len(mock_sio.events) == 0
+        # Должна быть отправлена ошибка о недействительной сессии
+        assert len(mock_sio.events) == 1
+        error_event = mock_sio.events[0]
+        assert error_event["event"] == "error"
+        assert error_event["data"]["msg"] == "bad_session"
 
 
 class TestServerValidation:

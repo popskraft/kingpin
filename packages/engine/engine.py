@@ -332,15 +332,16 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             if st.config.micro_bribe_once_per_turn and st.flags.get("micro_bribe_used", False):
                 return {"error": "micro_bribe_already_used"}
             if ap.tokens.reserve_money >= 2:
-                ap.tokens.reserve_money -= 2
-                ap.tokens.otboy += 2
                 tp = st.get_player(action.micro_bribe_target_player)
                 ts = tp.slots[action.micro_bribe_target_slot]
-                if ts.muscles > 0:
-                    ts.muscles -= 1
-                    tp.tokens.otboy += 1
-                st.flags["micro_bribe_used"] = True
-                ctx.log.append({"type": "micro_bribe", "slot": action.micro_bribe_target_slot})
+                if ts.card:  # Может взяткодавствовать только если есть карта
+                    ap.tokens.reserve_money -= 2
+                    ap.tokens.otboy += 2
+                    if ts.muscles > 0:
+                        ts.muscles -= 1
+                        tp.tokens.otboy += 1
+                    st.flags["micro_bribe_used"] = True
+                    ctx.log.append({"type": "micro_bribe", "slot": action.micro_bribe_target_slot})
         st.phase = TurnPhase.resolution
 
     elif isinstance(action, DiscardCard):
@@ -359,6 +360,19 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             combined = len(ap.hand) + len(ap.active_cards())
             if combined >= ap.hand_limit:
                 return {"error": "draw_limit_reached", "combined": combined, "limit": ap.hand_limit}
+        # Проверяем условия ДО извлечения карты
+        if action.place == "hand":
+            if not st.config.hand_enabled:
+                return {"error": "hand_disabled"}
+        elif action.place == "slot":
+            if action.slot_index is None:
+                return {"error": "slot_index_required"}
+            if action.slot_index < 0 or action.slot_index >= len(ap.slots):
+                return {"error": "bad_slot_index"}
+            slot = ap.slots[action.slot_index]
+            if slot.card is not None:
+                return {"error": "slot_not_empty"}
+        
         if not st.deck:
             # If the deck is empty but there are cards on the shelf — shuffle the shelf into a new face-down deck
             if st.shelf:
@@ -374,21 +388,13 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             resolve_event(ctx, card)
             ctx.log.append({"type": "draw_event", "card": card.id})
             st.phase = TurnPhase.resolution
-            return {"phase": st.phase}
+            return {"phase": st.phase.value}
         placed = None
         if action.place == "hand":
-            if not st.config.hand_enabled:
-                return {"error": "hand_disabled"}
             ap.hand.append(card)
             placed = {"zone": "hand"}
         elif action.place == "slot":
-            if action.slot_index is None:
-                return {"error": "slot_index_required"}
-            if action.slot_index < 0 or action.slot_index >= len(ap.slots):
-                return {"error": "bad_slot_index"}
             slot = ap.slots[action.slot_index]
-            if slot.card is not None:
-                return {"error": "slot_not_empty"}
             slot.card = card
             slot.face_up = True
             placed = {"zone": "slot", "slot": action.slot_index}
@@ -410,7 +416,7 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             boss_dead = True
             break
 
-    result = {"phase": st.phase}
+    result = {"phase": st.phase.value}
 
     if st.phase == TurnPhase.resolution:
         # End of turn and check for economic collapse of the active player
@@ -423,8 +429,9 @@ def apply_action(ctx: Ctx, action: Action) -> Dict:
             result["winner"] = st.active_player
             result["win_reason"] = "boss_killed"
             return result
+        # Store the resolution phase before next_turn changes it
+        result["phase"] = "resolution"
         # Pass the turn
         next_turn(ctx)
-        result["phase"] = st.phase
 
     return result

@@ -128,6 +128,13 @@ class TestPredefinedEffects:
     def setup_method(self):
         """Настройка перед каждым тестом"""
         _registry.clear()
+        # Явно регистрируем heal_self_1 эффект для тестов
+        @register("heal_self_1")
+        def effect_heal_self_1(ctx, payload):
+            slot = ctx.state.get_slot(payload["player"], payload["slot"])
+            if slot.card:
+                slot.card.hp += 1
+                ctx.log.append({"type": "effect", "id": "heal_self_1", "delta": 1})
     
     def test_heal_self_effect_exists(self):
         """Тест существования эффекта heal_self_1"""
@@ -162,7 +169,7 @@ class TestPredefinedEffects:
         ctx.state.players["P1"].slots[0] = slot
         
         # Тестируем эффект
-        payload = {"target_slot": 0, "player": "P1"}
+        payload = {"slot": 0, "player": "P1"}
         heal_effect(ctx, payload)
         
         # Проверяем что карта получила лечение

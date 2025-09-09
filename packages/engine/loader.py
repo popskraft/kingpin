@@ -152,7 +152,8 @@ def load_game(path: str | Path, csv_path: str | Path = None) -> Tuple[GameState,
     
     # Load cards from CSV
     cards = []
-    if csv_path.exists():
+    csv_path_obj = Path(csv_path)
+    if csv_path_obj.exists():
         cards = load_cards_from_csv(csv_path)
     
     # Build game state with config and cards

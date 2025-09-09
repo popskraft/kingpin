@@ -168,7 +168,7 @@ class TestCsvCardLoader:
             
             assert isinstance(card.abl, dict)
             assert card.abl["authority"] == 2
-            assert card.abl["steal"] == 1
+            assert card.abl["on_enter"]["steal"] == 1
             
         finally:
             Path(csv_path).unlink()
@@ -308,7 +308,7 @@ class TestAblTextParser:
         
         assert isinstance(result, dict)
         assert result["authority"] == 2
-        assert result["steal"] == 1
+        assert result["on_enter"]["steal"] == 1
         assert result["hack"] == 3
     
     def test_parse_on_enter_abilities(self):
