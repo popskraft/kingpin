@@ -70,6 +70,11 @@ class GameCard:
     def hp(self) -> int:
         return self.current_hp or 0
     
+    @hp.setter
+    def hp(self, value: int) -> None:
+        # Allow simulator combat to mutate current HP
+        self.current_hp = int(value)
+    
     @property
     def max_hp(self) -> int:
         return self.engine_card.hp
@@ -77,6 +82,11 @@ class GameCard:
     @property
     def atk(self) -> int:
         return self.current_atk or 0
+    
+    @atk.setter
+    def atk(self, value: int) -> None:
+        # Allow simulator effects to mutate current ATK
+        self.current_atk = int(value)
     
     @property
     def base_atk(self) -> int:
