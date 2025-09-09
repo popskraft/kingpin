@@ -1,275 +1,28 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { io, Socket } from 'socket.io-client'
+import { connectSocket, Socket } from './services/socket'
 import type { ViewState, Card, Slot, LogEntry, AttackMeta } from './types'
+import CardView from './components/CardView'
+import { getClanStripeClass } from './components/cardHelpers'
+import OpponentHandThumbnails from './components/OpponentHandThumbnails'
+import MoneyThumbnails from './components/MoneyThumbnails'
+import AnimatedNumber from './components/AnimatedNumber'
+import SlotView from './components/SlotView'
 
 const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL || 'http://localhost:8000'
 const ROOM = (import.meta as any).env?.VITE_ROOM || 'demo'
 
-function getCardEmoji(card: Card): string {
-  const text = `${card.name} ${(card.type || '')} ${(card.notes || '')}`.toLowerCase()
-  const has = (s: string) => text.includes(s)
-  // Role/name based
-  if (has('boss') || has('king') || has('queen') || has('leader') || has('chief')) return '👑'
-  if (has('assassin') || has('killer') || has('rogue') || has('ninja')) return '🗡️'
-  if (has('sniper') || has('shooter') || has('gunner') || has('hitman')) return '🎯'
-  if (has('tank') || has('guard') || has('bodyguard') || has('shield')) return '🛡️'
-  if (has('doctor') || has('medic') || has('healer') || has('nurse')) return '🩺'
-  if (has('engineer') || has('mechanic') || has('tech')) return '🛠️'
-  if (has('hacker') || has('cyber')) return '💻'
-  if (has('mage') || has('wizard') || has('sorcer')) return '✨'
-  if (has('thief') || has('pickpocket') || has('smuggler') || has('spy') || has('scout')) return '🕵️'
-  if (has('robot') || has('android') || has('mech')) return '🤖'
-  if (has('zombie') || has('undead') || has('ghoul')) return '🧟'
-  if (has('priest') || has('monk') || has('cleric')) return '🙏'
-  if (has('bard')) return '🎵'
-  if (has('fire') || has('flame') || has('pyro')) return '🔥'
-  if (has('ice') || has('frost')) return '❄️'
-  if (has('poison') || has('toxic') || has('venom')) return '☠️'
-  if (has('wolf') || has('tiger') || has('bear') || has('beast')) return '🐾'
-  // Stat-based fallback
-  if ((card.atk || 0) >= 5) return '⚔️'
-  if ((card.hp || 0) >= 5) return '🛡️'
-  return '🃏'
-}
-
-function getClanIcon(clan?: string): string | null {
-  const c = (clan || '').toLowerCase()
-  if (!c) return null
-  if (c.includes('gang')) return '🕶️'
-  if (c.includes('author')) return '🏛️'
-  if (c.includes('loner')) return '🧍'
-  return null
-}
-
-function getClanStripeClass(card: Card): string {
-  // Determine stripe color by clan (priority) or faction
-  const clanRaw = ((card.clan || '') as string).toLowerCase()
-  const factionRaw = (card.faction || '').toLowerCase()
-  
-  // Clans have priority over factions
-  if (clanRaw === 'gangsters') return 'gangsters'
-  if (clanRaw === 'authorities') return 'authorities'
-  if (clanRaw === 'loners') return 'loners'
-  if (clanRaw === 'solo') return 'solo'
-  if (factionRaw.includes('specialist')) return 'specialists'
-  if (factionRaw.includes('head')) return 'heads'
-  if (factionRaw.includes('storm')) return 'stormers'
-  if (factionRaw.includes('slip')) return 'slippery'
-  if (factionRaw) return 'faction'
-  return ''
-}
-
-function CardView({ card, faceUp, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo = null }: { card: Card | null, faceUp: boolean, bonusHp?: number, bonusD?: number, bonusR?: number, pairInfo?: { hp: number, d: number, r: number } | null }) {
-  if (!card) return (
-    <div className="card empty">
-      <div className="card-title">—</div>
-    </div>
-  )
-  if (!faceUp) return (
-    <div className="card facedown">
-      <div className="card-title">🎴 Face-down</div>
-    </div>
-  )
-  const hpDisp = (card.hp ?? 0) + (bonusHp || 0)
-  const atkDisp = (card.atk ?? 0)
-  const defDisp = (card.d ?? 0) + (bonusD || 0)
-  const rageDisp = (card.rage ?? 0) + (bonusR || 0)
-  const hasActivePair = !!(pairInfo && ((pairInfo.hp ?? 0) !== 0 || (pairInfo.d ?? 0) !== 0 || (pairInfo.r ?? 0) !== 0))
-  // Clan — main grouping for synergy
-  const clanRaw = (card.clan || '').toLowerCase()
-  const factionRaw = (card.faction || '').toLowerCase()
-  
-  // Determine stripe color by clan (priority) or faction
-  const stripeClan = clanRaw === 'gangsters' ? 'gangsters'
-    : clanRaw === 'authorities' ? 'authorities'
-    : clanRaw === 'loners' ? 'loners'
-    : clanRaw === 'solo' ? 'solo'
-    : factionRaw.includes('specialist') ? 'specialists'
-    : factionRaw.includes('head') ? 'heads'
-    : factionRaw.includes('stormer') ? 'stormers'
-    : factionRaw.includes('slippery') ? 'slippery'
-    : factionRaw ? 'faction'
-    : ''
-  // Clan/faction stripe (always shown)
-  const clanStripeClass = getClanStripeClass(card)
-  
-  return (
-    <div className="card">
-      {clanStripeClass ? <div className={`clan-stripe ${clanStripeClass}`} title={`Clan/Faction: ${clanStripeClass}`} /> : null}
-      {hasActivePair && stripeClan ? <div className={`synergy-stripe ${stripeClan}`} title={`Pair synergy: ${stripeClan}`} /> : null}
-      <div className="card-title">
-        {(card.clan ? (
-          <span className="clan-icon" title={`Clan: ${card.clan}`}>
-            {getClanIcon(card.clan as string) }
-          </span>
-        ) : null)}
-        {card.name}
-        {hasActivePair ? (
-          <span className="pair-badge" title={`Pair synergy +HP/+D/+R: ${pairInfo.hp}/${pairInfo.d}/${pairInfo.r}`}> 🔗</span>
-        ) : null}
-      </div>
-      <div className="card-illustration" aria-hidden="true">{getCardEmoji(card)}</div>
-      <div className="card-row card-stats">
-        <span className="stat hp">HP: <b>{hpDisp}</b></span>
-        {' '}•{' '}
-        <span className="stat atk">ATK: <b>{atkDisp}</b></span>
-        {' '}•{' '}
-        <span className="stat def">D: <b>{defDisp}</b></span>
-        {rageDisp > 0 && (
-          <>{' '}•{' '}<span className="stat rage">R: <b>{rageDisp}</b></span></>
-        )}
-      </div>
-      {((card.price ?? 0) > 0 || (card.corruption ?? 0) > 0) && (
-        <div className="card-row card-economy">
-          {(card.price ?? 0) > 0 && <span className="stat price">$: <b>{card.price}</b></span>}
-          {(card.price ?? 0) > 0 && (card.corruption ?? 0) > 0 && ' • '}
-          {(card.corruption ?? 0) > 0 && <span className="stat corruption">CRP: <b>{card.corruption}</b></span>}
-        </div>
-      )}
-      {card.faction ? (
-        <div className="card-row card-faction"><b>{card.faction}</b></div>
-      ) : null}
-      <div className="card-notes">{card.notes}</div>
-    </div>
-  )
-}
+// CardView and helper utilities moved to components/
 
 type DragPayload = { from: 'hand' | 'slot' | 'shelf'; fromIndex: number }
 type TokenDrag = { kind: 'money' | 'shield', owner: 'you' | 'opponent' | 'bank', slotIndex?: number }
 
-function OpponentHandThumbnails({ count }: { count: number }) {
-  const n = Math.max(0, count)
-  const shown = Math.min(n, 12)
-  return (
-    <div className="opp-hand" aria-label={`Opponent hand: ${n} cards`}>
-      <div className="opp-hand-title">Opponent Hand ({n})</div>
-      <div className="opp-hand-row">
-        {Array.from({ length: shown }).map((_, i) => (
-          <div key={i} className="opp-thumb" title="Face-down card" />
-        ))}
-        {n > shown ? <div className="opp-extra">+{n - shown}</div> : null}
-      </div>
-    </div>
-  )
-}
+// OpponentHandThumbnails moved to components/
 
-function MoneyThumbnails({ count, draggableTokens = false, owner = 'you' }: { count: number, draggableTokens?: boolean, owner?: 'you' | 'bank' }): JSX.Element {
-  const n = Math.max(0, count)
-  const shown = Math.min(n, 10)
-  return (
-    <div className="money-list">
-      {Array.from({ length: shown }).map((_, i) => (
-        <div
-          key={i}
-          className="money-token"
-          draggable={draggableTokens}
-          onDragStart={draggableTokens ? (e) => {
-            const payload: TokenDrag = { kind: 'money', owner }
-            e.dataTransfer.setData('application/x-token', JSON.stringify(payload))
-          } : undefined}
-          title={draggableTokens ? 'Drag to a card to add a shield' : undefined}
-        />
-      ))}
-      {n > shown ? <div className="money-extra">+{n - shown}</div> : null}
-    </div>
-  )
-}
+// MoneyThumbnails moved to components/
 
-function AnimatedNumber({ value, className }: { value: number, className?: string }) {
-  const [pulse, setPulse] = useState(false)
-  const prev = useRef(value)
-  useEffect(() => {
-    if (prev.current !== value) {
-      setPulse(true)
-      prev.current = value
-      const t = setTimeout(() => setPulse(false), 320)
-      return () => clearTimeout(t)
-    }
-  }, [value])
-  return <span className={`count ${className || ''} ${pulse ? 'pulse' : ''}`}>{value}</span>
-}
+// AnimatedNumber moved to components/
 
-function SlotView({ slot, onFlip, onDropToSlot, index, editable, owner, onTokenPlus, onTokenPlusFromBank, onTokenMinus, canAddShield, canRemoveShield, onReceiveShieldFrom, extraClassName, onClickCard, onHoverStart, onHoverEnd, onDragAnyStart, onDragAnyEnd, onSlotDragStart, bonusHp = 0, bonusD = 0, bonusR = 0, pairInfo = null }:
-  { slot: Slot, index: number, editable?: boolean, owner: 'you' | 'opponent', onFlip?: () => void, onDropToSlot?: (from: DragPayload) => void, onTokenPlus?: () => void, onTokenPlusFromBank?: () => void, onTokenMinus?: () => void, canAddShield?: boolean, canRemoveShield?: boolean, onReceiveShieldFrom?: (srcIndex: number) => void, extraClassName?: string, onClickCard?: () => void, onHoverStart?: () => void, onHoverEnd?: () => void, onDragAnyStart?: () => void, onDragAnyEnd?: () => void, onSlotDragStart?: (index: number) => void, bonusHp?: number, bonusD?: number, bonusR?: number, pairInfo?: { hp: number, d: number, r: number } | null }): JSX.Element {
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    // Card movement
-    const data = e.dataTransfer.getData('application/json')
-    if (data) {
-      try {
-        const from = JSON.parse(data) as DragPayload
-        onDropToSlot?.(from)
-        return
-      } catch {}
-    }
-    // Token movement
-    const tokenData = e.dataTransfer.getData('application/x-token')
-    if (tokenData) {
-      try {
-        const tok = JSON.parse(tokenData) as TokenDrag
-        // Money -> Shield on your slot
-        if (tok.kind === 'money' && owner === 'you') {
-          if (tok.owner === 'you') onTokenPlus?.()
-          else if (tok.owner === 'bank') onTokenPlusFromBank?.()
-        }
-        // Shield moved between your slots
-        if (tok.kind === 'shield' && owner === 'you' && typeof tok.slotIndex === 'number') {
-          if (tok.slotIndex !== index) {
-            onReceiveShieldFrom?.(tok.slotIndex)
-          }
-        }
-      } catch {}
-    }
-  }
-  const draggable = editable && !!slot.card
-  const handleDragStart = (e: React.DragEvent) => {
-    onDragAnyStart?.()
-    onSlotDragStart?.(index)
-    e.dataTransfer.setData('application/json', JSON.stringify({ from: 'slot', fromIndex: index }))
-  }
-  return (
-    <div className={`slot ${extraClassName || ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>
-      <div className="shield-thumbs" title={`Shield defenders: ${Math.min(4, Math.max(0, slot.muscles))}`} onDragOver={(e) => e.preventDefault()}>
-        {Array.from({ length: 4 }).map((_, i) => {
-          const filled = i < Math.min(4, Math.max(0, slot.muscles))
-          return (
-            <div
-              key={i}
-              className={`shield-thumb ${filled ? 'filled' : 'empty'}`}
-              aria-label={filled ? 'defender' : 'placeholder'}
-              draggable={filled}
-              onDragStart={filled ? (e) => {
-                const payload: TokenDrag = { kind: 'shield', owner, slotIndex: index }
-                e.dataTransfer.setData('application/x-token', JSON.stringify(payload))
-              } : undefined}
-            />
-          )
-        })}
-      </div>
-      <div className="slot-header">
-        {editable ? (
-          <div className="shield-compact">
-            <button className="mini-btn" onClick={onTokenMinus} title="-shield" disabled={!(canRemoveShield ?? true) || (slot.muscles ?? 0) <= 0}>−</button>
-            <div className="shield-chip" title="Shield tokens"><span className="chip-icon">🛡</span><span className="chip-count">{slot.muscles}</span></div>
-            <button className="mini-btn" onClick={onTokenPlus} title="+shield" disabled={!(canAddShield ?? true)}>＋</button>
-          </div>
-        ) : (
-          <div className="shield-compact readonly">
-            <div className="shield-chip" title="Shield tokens"><span className="chip-icon">🛡</span><span className="chip-count">{slot.muscles}</span></div>
-          </div>
-        )}
-      </div>
-      <div className="slot-inner">
-        <div className="card-wrap" draggable={draggable} onDragStart={draggable ? handleDragStart : undefined} onDragEnd={onDragAnyEnd} onDoubleClick={onFlip} onClick={onClickCard} onMouseEnter={onHoverStart} onMouseLeave={onHoverEnd}>
-          <CardView card={slot.card} faceUp={slot.face_up} bonusHp={bonusHp} bonusD={bonusD} bonusR={bonusR} pairInfo={pairInfo} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// SlotView moved to components/
 
 export default function App(): JSX.Element {
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -334,7 +87,7 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     // Allow both websocket and polling to avoid connection issues in dev/proxy environments
-    const s = io(SERVER_URL)
+    const s = connectSocket(SERVER_URL)
     setSocket(s)
 
     s.on('connect', () => {
